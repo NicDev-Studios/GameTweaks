@@ -4,8 +4,18 @@
   },
   "navigation": {
     "primary": "Primary navigation",
+    "games": "Steam games",
     "settings": "Settings",
     "tagline": "Game customization"
+  },
+  "steamGames": {
+    "eyebrow": "Steam library",
+    "title": "Installed games",
+    "description": "Games found in your local Steam libraries.",
+    "loading": "Reading installed Steam games…",
+    "empty": "No installed Steam games were found.",
+    "error": "Steam games could not be loaded.",
+    "listLabel": "Installed Steam games"
   },
   "settings": {
     "eyebrow": "Preferences",

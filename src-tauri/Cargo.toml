@@ -28,3 +28,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"

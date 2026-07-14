@@ -1,0 +1,38 @@
+.game-list {
+  display: grid;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-row,
+.game-list-status {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--panel-soft);
+}
+
+.game-row {
+  min-height: 3rem;
+  padding: 0.875rem 1rem;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.game-list-status {
+  display: grid;
+  min-height: 7rem;
+  padding: 1rem;
+  place-items: center;
+  color: var(--muted);
+  text-align: center;
+}
+
+.game-list-status.error {
+  border-color: color-mix(in srgb, var(--danger), transparent 52%);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger), transparent 90%);
+}

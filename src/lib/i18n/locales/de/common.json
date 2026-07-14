@@ -4,8 +4,18 @@
   },
   "navigation": {
     "primary": "Hauptnavigation",
+    "games": "Steam-Spiele",
     "settings": "Einstellungen",
     "tagline": "Game-Anpassungen"
+  },
+  "steamGames": {
+    "eyebrow": "Steam-Bibliothek",
+    "title": "Installierte Spiele",
+    "description": "Spiele aus deinen lokalen Steam-Bibliotheken.",
+    "loading": "Installierte Steam-Spiele werden gelesen…",
+    "empty": "Es wurden keine installierten Steam-Spiele gefunden.",
+    "error": "Steam-Spiele konnten nicht geladen werden.",
+    "listLabel": "Installierte Steam-Spiele"
   },
   "settings": {
     "eyebrow": "Präferenzen",

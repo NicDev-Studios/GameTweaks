@@ -1,5 +1,8 @@
 <script lang="ts">
   import { t } from '$lib/i18n';
+
+  export let activeView: 'games' | 'settings';
+  export let onNavigate: (view: 'games' | 'settings') => void;
 </script>
 
 <div class="app-shell">
@@ -13,7 +16,21 @@
     </div>
 
     <nav aria-label={$t('navigation.primary')}>
-      <button class="active" type="button" aria-current="page">
+      <button
+        class:active={activeView === 'games'}
+        type="button"
+        aria-current={activeView === 'games' ? 'page' : undefined}
+        on:click={() => onNavigate('games')}
+      >
+        <span class="material-symbols-rounded" aria-hidden="true">sports_esports</span>
+        {$t('navigation.games')}
+      </button>
+      <button
+        class:active={activeView === 'settings'}
+        type="button"
+        aria-current={activeView === 'settings' ? 'page' : undefined}
+        on:click={() => onNavigate('settings')}
+      >
         <span class="material-symbols-rounded" aria-hidden="true">tune</span>
         {$t('navigation.settings')}
       </button>
