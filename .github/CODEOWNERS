@@ -4,6 +4,7 @@
 
 /.github/workflows/ @NicDevTV
 /.github/CODEOWNERS @NicDevTV
+/.github/copilot-instructions.md @NicDevTV
 
 /src-tauri/capabilities/ @NicDevTV
 /src-tauri/icons/ @NicDevTV
