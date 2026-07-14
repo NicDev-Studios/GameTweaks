@@ -5,6 +5,8 @@
 /.github/workflows/ @NicDevTV
 /.github/CODEOWNERS @NicDevTV
 /.github/copilot-instructions.md @NicDevTV
+/LICENSE @NicDevTV
+/CONTRIBUTING.md @NicDevTV
 
 /src-tauri/capabilities/ @NicDevTV
 /src-tauri/icons/ @NicDevTV
@@ -12,6 +14,9 @@
 /src-tauri/tauri.pr.conf.json @NicDevTV
 /src-tauri/Cargo.toml @NicDevTV
 /src-tauri/Cargo.lock @NicDevTV
+/src-tauri/build.rs @NicDevTV
+/src-tauri/src/main.rs @NicDevTV
+/src-tauri/src/lib.rs @NicDevTV
 /src-tauri/src/commands/ @NicDevTV
 /src-tauri/src/config/ @NicDevTV
 /src-tauri/src/core/ @NicDevTV
@@ -22,4 +27,5 @@
 
 /package.json @NicDevTV
 /pnpm-lock.yaml @NicDevTV
+/pnpm-workspace.yaml @NicDevTV
 /.npmrc @NicDevTV
