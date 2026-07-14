@@ -26,6 +26,9 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 app.handle()
+                    .plugin(tauri_plugin_opener::init())
+                    .expect("failed to initialize opener plugin");
+                app.handle()
                     .plugin(tauri_plugin_process::init())
                     .expect("failed to initialize process plugin");
                 app.handle()
