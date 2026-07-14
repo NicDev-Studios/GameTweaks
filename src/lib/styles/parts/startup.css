@@ -1,0 +1,200 @@
+.startup-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgb(20 19 17), rgb(13 13 12) 58%, rgb(8 8 7)),
+    var(--bg);
+  animation: startup-exit 420ms ease 1.22s forwards;
+}
+
+.startup-intro::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(180deg, rgb(255 248 235 / 0.045), transparent 32%),
+    radial-gradient(ellipse at 50% 48%, rgb(255 248 235 / 0.105), transparent 34rem);
+}
+
+.startup-glass {
+  position: relative;
+  display: grid;
+  width: min(19.25rem, calc(100vw - 2rem));
+  place-items: center;
+  padding: 1.55rem 1.5rem 1.4rem;
+  border: 1px solid rgb(255 248 235 / 0.18);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgb(255 248 235 / 0.075), transparent 52%),
+    rgb(28 27 25 / 0.78);
+  box-shadow:
+    0 1.5rem 4.5rem rgb(0 0 0 / 0.34),
+    inset 0 1px 0 rgb(255 248 235 / 0.09);
+  backdrop-filter: blur(26px) saturate(1.05);
+  animation: startup-card 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.startup-glass::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.22), transparent);
+}
+
+.startup-logo {
+  position: relative;
+  display: grid;
+  z-index: 1;
+  width: 4rem;
+  height: 4rem;
+  place-items: center;
+  border: 1px solid rgb(255 248 235 / 0.42);
+  border-radius: 0.95rem;
+  color: #171512;
+  background:
+    linear-gradient(145deg, #fffaf0, #ddd3c3);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.56),
+    0 0.875rem 2.25rem rgb(0 0 0 / 0.28);
+  font-size: 1.8rem;
+  font-weight: 850;
+  animation: startup-logo 820ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.startup-logo span {
+  transform: translateY(-0.03em);
+}
+
+.startup-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1.05rem;
+  text-align: center;
+  animation: startup-copy 640ms ease 420ms both;
+}
+
+.startup-copy strong {
+  color: #f4eee5;
+  font-size: 1.08rem;
+  letter-spacing: 0;
+}
+
+.startup-copy span {
+  color: rgb(244 238 229 / 0.64);
+  font-size: 0.76rem;
+}
+
+.startup-progress {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 0.2rem;
+  margin-top: 1.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 248 235 / 0.09);
+}
+
+.startup-progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #cdbfae, #fff4e3);
+  transform: translateX(-102%);
+  animation: startup-progress 950ms cubic-bezier(0.45, 0, 0.2, 1) 320ms forwards;
+}
+
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 500,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes startup-card {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes startup-logo {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes startup-copy {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes startup-progress {
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes startup-exit {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}

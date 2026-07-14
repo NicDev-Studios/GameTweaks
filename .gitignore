@@ -1,0 +1,16 @@
+node_modules/
+.pnpm-store/
+.svelte-kit/
+dist/
+build/
+
+src-tauri/target/
+src-tauri/gen/
+src-tauri/.tauri/
+
+.DS_Store
+*.log
+*.tmp
+.env
+.env.*
+!.env.example

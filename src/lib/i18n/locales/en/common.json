@@ -1,0 +1,49 @@
+{
+  "app": {
+    "description": "A desktop app for managing game tweaks."
+  },
+  "navigation": {
+    "primary": "Primary navigation",
+    "settings": "Settings",
+    "tagline": "Game customization"
+  },
+  "settings": {
+    "eyebrow": "Preferences",
+    "title": "Settings",
+    "description": "Keep the interface aligned with your system or pin a specific appearance.",
+    "language": {
+      "title": "Language",
+      "description": "Interface language",
+      "ariaLabel": "Language",
+      "automatic": "German (Automatic)",
+      "english": "English"
+    }
+  },
+  "updates": {
+    "title": "Updates",
+    "currentVersion": "Current version {version}",
+    "unknownVersion": "unknown",
+    "available": "Version {version} is ready to download.",
+    "upToDate": "GameTweaks is up to date.",
+    "downloading": "Downloading and installing the signed update.",
+    "readyToRestart": "Update installed. Restart GameTweaks to finish.",
+    "failed": "Update check failed.",
+    "startupCheck": "Checking for updates when GameTweaks opens.",
+    "errorDetails": "Show updater error details",
+    "downloadProgress": "Update download progress",
+    "channel": "Update channel",
+    "stable": "Stable",
+    "beta": "Beta",
+    "check": "Check",
+    "download": "Download update",
+    "restart": "Restart"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "themeMode": "Theme mode",
+    "themeModeLabel": "Theme mode",
+    "system": "System",
+    "dark": "Dark",
+    "light": "Light"
+  }
+}

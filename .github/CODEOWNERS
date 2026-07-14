@@ -1,0 +1,20 @@
+# Security-sensitive ownership for GameGate.
+# Keep these paths reviewed because they control release, permissions,
+# networking, process boundaries, and dependency resolution.
+
+/.github/workflows/ @NicDevTV
+/.github/CODEOWNERS @NicDevTV
+
+/src-tauri/capabilities/ @NicDevTV
+/src-tauri/icons/ @NicDevTV
+/src-tauri/tauri.conf.json @NicDevTV
+/src-tauri/tauri.pr.conf.json @NicDevTV
+/src-tauri/Cargo.toml @NicDevTV
+/src-tauri/Cargo.lock @NicDevTV
+/src-tauri/src/commands/ @NicDevTV
+/src-tauri/src/minecraft/ @NicDevTV
+/src-tauri/src/process/ @NicDevTV
+
+/package.json @NicDevTV
+/pnpm-lock.yaml @NicDevTV
+/.npmrc @NicDevTV

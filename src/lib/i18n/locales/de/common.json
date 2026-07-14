@@ -1,0 +1,49 @@
+{
+  "app": {
+    "description": "Eine Desktop-App zur Verwaltung von Game-Tweaks."
+  },
+  "navigation": {
+    "primary": "Hauptnavigation",
+    "settings": "Einstellungen",
+    "tagline": "Game-Anpassungen"
+  },
+  "settings": {
+    "eyebrow": "Präferenzen",
+    "title": "Einstellungen",
+    "description": "Passe die Oberfläche an dein System an oder lege ein festes Erscheinungsbild fest.",
+    "language": {
+      "title": "Sprache",
+      "description": "Sprache der Oberfläche",
+      "ariaLabel": "Sprache",
+      "automatic": "Deutsch (Automatisch)",
+      "english": "English"
+    }
+  },
+  "updates": {
+    "title": "Updates",
+    "currentVersion": "Aktuelle Version {version}",
+    "unknownVersion": "unbekannt",
+    "available": "Version {version} kann heruntergeladen werden.",
+    "upToDate": "GameTweaks ist aktuell.",
+    "downloading": "Das signierte Update wird heruntergeladen und installiert.",
+    "readyToRestart": "Update installiert. Starte GameTweaks neu, um abzuschließen.",
+    "failed": "Update-Prüfung fehlgeschlagen.",
+    "startupCheck": "Beim Öffnen von GameTweaks wird nach Updates gesucht.",
+    "errorDetails": "Updater-Fehlerdetails anzeigen",
+    "downloadProgress": "Fortschritt des Update-Downloads",
+    "channel": "Update-Kanal",
+    "stable": "Stable",
+    "beta": "Beta",
+    "check": "Prüfen",
+    "download": "Update herunterladen",
+    "restart": "Neu starten"
+  },
+  "appearance": {
+    "title": "Erscheinungsbild",
+    "themeMode": "Theme-Modus",
+    "themeModeLabel": "Theme-Modus",
+    "system": "System",
+    "dark": "Dunkel",
+    "light": "Hell"
+  }
+}

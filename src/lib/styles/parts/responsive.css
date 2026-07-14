@@ -1,0 +1,86 @@
+@media (max-width: 900px) {
+  .app-shell,
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  nav {
+    grid-template-columns: 1fr;
+  }
+
+  nav button {
+    justify-content: flex-start;
+  }
+
+  .settings-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .update-control {
+    justify-items: stretch;
+    text-align: left;
+  }
+
+  .update-message-row {
+    justify-content: flex-start;
+  }
+
+  .update-error-tooltip {
+    right: auto;
+    left: 0;
+  }
+
+  .update-actions {
+    justify-content: stretch;
+  }
+
+  .update-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .update-channel-control {
+    align-self: stretch;
+  }
+
+  .update-channel-control button,
+  .update-check-action,
+  .update-primary-action {
+    flex: 1;
+  }
+
+  .primary-action,
+  .secondary-action {
+    flex: 1;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    padding: 0.5rem;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .startup-intro,
+  .startup-glass,
+  .startup-logo,
+  .startup-copy,
+  .startup-progress span {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+}

@@ -1,0 +1,13 @@
+packages:
+  - .
+
+overrides:
+  cookie: ^0.7.0
+
+onlyBuiltDependencies:
+  - esbuild
+
+allowBuilds:
+  esbuild: true
+
+nodeLinker: isolated

@@ -1,0 +1,15 @@
+[files]
+extend-exclude = [
+  "node_modules",
+  "pnpm-lock.yaml",
+  "src/lib/i18n/locales/de/**",
+  "src-tauri/Cargo.lock",
+  "src-tauri/target",
+]
+
+[default]
+extend-ignore-re = [
+]
+
+[default.extend-words]
+startet = "startet"
