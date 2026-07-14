@@ -9,7 +9,8 @@ use crate::config::model::UpdateChannel;
 use crate::core::error::{AppError, AppResult, ErrorResponse};
 use crate::core::state::AppState;
 
-const GITHUB_RELEASES_API_URL: &str = "https://api.github.com/repos/NicDev-Studios/GameTweaks/releases";
+const GITHUB_RELEASES_API_URL: &str =
+    "https://api.github.com/repos/NicDev-Studios/GameTweaks/releases";
 const UPDATER_MANIFEST_ASSET_NAME: &str = "latest.json";
 const UPDATE_PROGRESS_EVENT: &str = "gametweaks-update-progress";
 

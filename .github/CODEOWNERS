@@ -1,6 +1,6 @@
-# Security-sensitive ownership for GameGate.
+# Security-sensitive ownership for GameTweaks.
 # Keep these paths reviewed because they control release, permissions,
-# networking, process boundaries, and dependency resolution.
+# updater behavior, persistent configuration, and dependency resolution.
 
 /.github/workflows/ @NicDevTV
 /.github/CODEOWNERS @NicDevTV
@@ -12,8 +12,12 @@
 /src-tauri/Cargo.toml @NicDevTV
 /src-tauri/Cargo.lock @NicDevTV
 /src-tauri/src/commands/ @NicDevTV
-/src-tauri/src/minecraft/ @NicDevTV
-/src-tauri/src/process/ @NicDevTV
+/src-tauri/src/config/ @NicDevTV
+/src-tauri/src/core/ @NicDevTV
+/src-tauri/src/updater.rs @NicDevTV
+
+/src/lib/api/updater.ts @NicDevTV
+/src/lib/stores/updater.ts @NicDevTV
 
 /package.json @NicDevTV
 /pnpm-lock.yaml @NicDevTV
