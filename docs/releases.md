@@ -36,9 +36,11 @@ such as `0.0.0-dev.123`, but remain excluded from the application updater.
 
 ### Development builds
 
-Every push to `main` updates the `DEV_RELEASE` tag and its GitHub Prerelease.
-The release is rebuilt for every supported platform and is intended only for
-testing the newest reviewed development state. Its permanent release page is:
+After the CI workflow succeeds on `main`, the release workflow updates the
+`DEV_RELEASE` tag and its GitHub Prerelease from the exact commit checked by
+CI. Failed or cancelled CI runs do not publish a development build. The release
+is rebuilt for every supported platform and is intended only for testing the
+newest reviewed development state. Its permanent release page is:
 
 ```text
 https://github.com/NicDev-Studios/GameTweaks/releases/tag/DEV_RELEASE

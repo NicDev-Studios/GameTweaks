@@ -2,14 +2,19 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*.*.*"
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
 
 concurrency:
-  group: release-${{ github.ref == 'refs/heads/main' && 'DEV_RELEASE' || github.ref }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+  group: release-${{ github.event_name == 'workflow_run' && 'DEV_RELEASE' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'workflow_run' }}
 
 permissions:
   contents: write
@@ -18,6 +23,7 @@ jobs:
   resolve_version:
     name: Resolve version
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
     outputs:
       app_version: ${{ steps.version.outputs.app_version }}
     steps:
@@ -25,7 +31,7 @@ jobs:
         id: version
         shell: bash
         run: |
-          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
             app_version="0.0.0-dev.$GITHUB_RUN_NUMBER"
           else
             app_version="${GITHUB_REF_NAME#v}"
@@ -40,9 +46,9 @@ jobs:
     needs: resolve_version
     env:
       APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
-      RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && 'DEV_RELEASE' || github.ref_name }}
-      RELEASE_SHA: ${{ github.sha }}
-      IS_DEV_RELEASE: ${{ github.ref == 'refs/heads/main' }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_run' && 'DEV_RELEASE' || github.ref_name }}
+      RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      IS_DEV_RELEASE: ${{ github.event_name == 'workflow_run' }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Create draft release
@@ -114,7 +120,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     env:
       APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
-      RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && 'DEV_RELEASE' || github.ref_name }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_run' && 'DEV_RELEASE' || github.ref_name }}
+      RELEASE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       fail-fast: false
@@ -140,6 +147,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7.0.0
+        with:
+          ref: ${{ env.RELEASE_SHA }}
 
       - name: Install Linux Tauri dependencies
         if: matrix.platform == 'ubuntu-latest'
@@ -312,7 +321,7 @@ jobs:
       - release
     env:
       APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
-      RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && 'DEV_RELEASE' || github.ref_name }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_run' && 'DEV_RELEASE' || github.ref_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:

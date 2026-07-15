@@ -17,6 +17,6 @@ Create a short-lived branch from `main` using a descriptive prefix:
 - `docs/<name>` for documentation-only changes
 - `chore/<name>` for maintenance work
 
-Open the pull request against `main`. Every push to `main` updates the rolling `DEV_RELEASE` GitHub Prerelease for development-only testing. This tag is movable and must not be treated as a stable or reproducible version.
+Open the pull request against `main`. After the CI workflow succeeds on `main`, it updates the rolling `DEV_RELEASE` GitHub Prerelease for development-only testing. Failed or cancelled CI runs do not publish a development build. This tag is movable and must not be treated as a stable or reproducible version.
 
 For a short beta cycle, prerelease tags such as `v1.0.0-beta.1` may be created directly from a tested commit on `main`. If a version needs a longer stabilization period while new work continues on `main`, create a temporary branch such as `release/1.0.0`. Publish its betas as `v1.0.0-beta.1`, `v1.0.0-beta.2`, and so on, then publish the stable `v1.0.0` tag from the tested release branch. Merge stabilization fixes back into `main` and delete the release branch after publication.

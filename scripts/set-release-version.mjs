@@ -23,28 +23,34 @@ function updateJson(path) {
   writeFileSync(path, updated);
 }
 
-function updatePackageSection(path, sectionMarker) {
+function updatePackageSection(path, sectionPattern, sectionLabel) {
   const contents = readFileSync(path, 'utf8');
-  const sectionStart = contents.indexOf(sectionMarker);
-  if (sectionStart === -1) {
-    throw new Error(`${path} does not contain ${sectionMarker}`);
+  const sectionMatch = contents.match(sectionPattern);
+  if (!sectionMatch || sectionMatch.index === undefined) {
+    throw new Error(`${path} does not contain ${sectionLabel}`);
   }
 
-  const nextSection = contents.indexOf('\n[', sectionStart + sectionMarker.length);
+  const sectionStart = sectionMatch.index;
+  const nextSection = contents.indexOf('\n[', sectionStart + sectionMatch[0].length);
   const sectionEnd = nextSection === -1 ? contents.length : nextSection;
   const section = contents.slice(sectionStart, sectionEnd);
-  if (!/^version = "[^"]+"$/m.test(section)) {
+  const versionLinePattern = /^(version = ")[^"]+("\r?)$/m;
+  if (!versionLinePattern.test(section)) {
     throw new Error(`${path} package section does not contain a version`);
   }
 
-  const updatedSection = section.replace(/^version = "[^"]+"$/m, `version = "${version}"`);
+  const updatedSection = section.replace(versionLinePattern, `$1${version}$2`);
 
   writeFileSync(path, `${contents.slice(0, sectionStart)}${updatedSection}${contents.slice(sectionEnd)}`);
 }
 
 updateJson('package.json');
 updateJson('src-tauri/tauri.conf.json');
-updatePackageSection('src-tauri/Cargo.toml', '[package]');
-updatePackageSection('src-tauri/Cargo.lock', '[[package]]\nname = "gametweaks"');
+updatePackageSection('src-tauri/Cargo.toml', /^\[package\]\r?$/m, '[package]');
+updatePackageSection(
+  'src-tauri/Cargo.lock',
+  /^\[\[package\]\]\r?\nname = "gametweaks"\r?$/m,
+  'the gametweaks package'
+);
 
 process.stdout.write(`Configured GameTweaks version ${version}\n`);
