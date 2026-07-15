@@ -287,16 +287,90 @@
 
 .install-progress {
   display: grid;
-  min-width: min(240px, 100%);
-  gap: 0.45rem;
+  min-width: min(18rem, 100%);
+  gap: 0.55rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--accent), transparent 72%);
+  border-radius: 0.7rem;
   color: var(--muted);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--accent), transparent 92%), transparent 70%),
+    color-mix(in srgb, var(--panel-strong), transparent 12%);
   font-size: 0.8rem;
+  overflow: hidden;
 }
 
-.install-progress progress {
+.detail-card > .install-progress {
+  flex: 1 0 100%;
+}
+
+.install-progress-heading,
+.install-progress-phase {
+  display: flex;
+  align-items: center;
+}
+
+.install-progress-heading {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.install-progress-phase {
+  min-width: 0;
+  gap: 0.45rem;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.install-progress-phase .material-symbols-rounded {
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+
+.install-progress-heading strong {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.install-progress-track {
+  position: relative;
   width: 100%;
-  height: 0.4rem;
-  accent-color: var(--accent);
+  height: 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent), transparent 86%);
+  overflow: hidden;
+}
+
+.install-progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent), white 8%), var(--accent));
+  box-shadow: 0 0 0.7rem color-mix(in srgb, var(--accent), transparent 48%);
+  transition: width 180ms ease;
+}
+
+.install-progress-track.indeterminate > span {
+  width: 38%;
+  animation: install-progress-indeterminate 1.15s ease-in-out infinite;
+}
+
+.install-progress-bytes {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes install-progress-indeterminate {
+  from {
+    transform: translateX(-110%);
+  }
+
+  to {
+    transform: translateX(275%);
+  }
 }
 
 .danger-action {
@@ -308,6 +382,13 @@
 .unsupported-state.error {
   border-color: color-mix(in srgb, var(--danger), transparent 55%);
   color: var(--danger);
+}
+
+.detail-state.error {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--danger), transparent 88%), transparent 72%),
+    var(--panel-soft);
+  animation: detail-state-enter 220ms ease both;
 }
 
 .unsupported-state {
@@ -324,10 +405,42 @@
   font-size: 2rem;
 }
 
+.unsupported-state.error > .material-symbols-rounded {
+  color: var(--danger);
+  animation: detail-error-pulse 1.8s ease-in-out infinite;
+}
+
+.unsupported-state.loading > .material-symbols-rounded {
+  color: var(--accent);
+}
+
 .unsupported-state p {
   max-width: 34rem;
   margin: 0;
   color: var(--muted);
+}
+
+@keyframes detail-state-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes detail-error-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 color-mix(in srgb, var(--danger), transparent 100%));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 0.35rem color-mix(in srgb, var(--danger), transparent 48%));
+  }
 }
 
 .mod-list,

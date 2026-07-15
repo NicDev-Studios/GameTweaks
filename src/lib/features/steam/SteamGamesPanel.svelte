@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import InstallProgress from '$lib/components/InstallProgress.svelte';
   import SectionHeader from '$lib/components/SectionHeader.svelte';
   import {
     getGameSupport,
@@ -407,8 +408,6 @@
       {/if}
     </div>
 
-    {#if pageError}<p class="detail-alert error" role="alert">{pageError}</p>{/if}
-
     <article class="detail-card">
       <div>
         <h2>BepInEx</h2>
@@ -438,19 +437,24 @@
         {/if}
       </div>
       {#if progress}
-        <div class="install-progress" role="status" aria-live="polite">
-          <span>{$t(`steamGames.bepInEx.progress.${progress.stage}`)}</span>
-          {#if progress.percentage !== undefined}
-            <progress max="100" value={progress.percentage}>{progress.percentage}%</progress>
-          {:else}
-            <progress></progress>
-          {/if}
-        </div>
+        <InstallProgress {progress} />
       {/if}
     </article>
 
+    {#if pageError}
+      <div class="unsupported-state detail-state error" role="alert">
+        <span class="material-symbols-rounded" aria-hidden="true">error</span>
+        <h2>{$t('steamGames.detail.actionErrorTitle')}</h2>
+        <p>{pageError}</p>
+      </div>
+    {/if}
+
     {#if supportLoading}
-      <p class="game-list-status" role="status">{$t('steamGames.detail.loading')}</p>
+      <div class="unsupported-state detail-state loading" role="status" aria-live="polite">
+        <span class="material-symbols-rounded mod-spinner" aria-hidden="true">progress_activity</span>
+        <h2>{$t('steamGames.detail.loadingTitle')}</h2>
+        <p>{$t('steamGames.detail.loading')}</p>
+      </div>
     {:else if support?.status === 'unsupported'}
       <div class="unsupported-state" role="status">
         <span class="material-symbols-rounded" aria-hidden="true">extension_off</span>
@@ -509,14 +513,7 @@
               {/if}
 
               {#if modProgress[mod.modId] && modProgress[mod.modId].stage !== 'completed'}
-                <div class="install-progress" role="status" aria-live="polite">
-                  <span>{$t(`steamGames.bepInEx.progress.${modProgress[mod.modId].stage}`)}</span>
-                  {#if modProgress[mod.modId].percentage !== undefined}
-                    <progress max="100" value={modProgress[mod.modId].percentage}>{modProgress[mod.modId].percentage}%</progress>
-                  {:else}
-                    <progress></progress>
-                  {/if}
-                </div>
+                <InstallProgress progress={modProgress[mod.modId]} />
               {/if}
 
               {#if mod.dependencies.length || mod.conflicts.length}

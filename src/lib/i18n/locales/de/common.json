@@ -19,7 +19,9 @@
     "detail": {
       "back": "Alle Spiele",
       "eyebrow": "Spieldetails",
+      "loadingTitle": "Spieldetails werden geladen",
       "loading": "Spielunterstützung wird geladen…",
+      "actionErrorTitle": "Aktion nicht möglich",
       "unsupportedTitle": "Game not supported",
       "unsupportedDescription": "Für dieses Spiel gibt es noch keine geprüfte GameTweaks-Definition.",
       "unavailableTitle": "Support-Daten nicht verfügbar",
