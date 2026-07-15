@@ -47,7 +47,7 @@ public sealed class Plugin : BasePlugin
         }
     }
 
-    private static void LogStartupError(Exception error) =>
+    private void LogStartupError(Exception error) =>
         Log.LogError($"GameTweaks Agent could not start ({error.GetType().Name}): {error.Message}");
 
     public override bool Unload()
