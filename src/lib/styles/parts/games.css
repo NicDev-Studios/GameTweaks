@@ -184,7 +184,7 @@
 }
 
 .detail-heading,
-.detail-card,
+.detail-card-main,
 .mods-heading,
 .mod-card header,
 .mod-title-row,
@@ -270,6 +270,11 @@
   background: var(--panel-soft);
 }
 
+.detail-card {
+  display: grid;
+  gap: 1rem;
+}
+
 .detail-card h2,
 .mods-heading h2,
 .mod-card h3,
@@ -301,7 +306,8 @@
 }
 
 .detail-card > .install-progress {
-  flex: 1 0 100%;
+  width: 100%;
+  min-width: 0;
 }
 
 .install-progress-heading,
@@ -602,7 +608,7 @@
   }
 
   .detail-heading,
-  .detail-card,
+  .detail-card-main,
   .mods-heading,
   .mod-card header,
   .config-field {

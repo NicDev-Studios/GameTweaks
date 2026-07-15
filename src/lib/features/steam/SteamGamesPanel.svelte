@@ -409,32 +409,34 @@
     </div>
 
     <article class="detail-card">
-      <div>
-        <h2>BepInEx</h2>
-        <p>
-          {#if selectedGame.bepInEx.status === 'installed'}
-            {$t('steamGames.bepInEx.installedVersion', {
-              version: selectedGame.bepInEx.installedVersion ?? $t('steamGames.detail.unknownVersion')
-            })}
-          {:else if selectedGame.bepInEx.status === 'installable'}
-            {$t('steamGames.detail.bepInExReady')}
-          {:else}
-            {reasonLabel(selectedGame.bepInEx.reason)}
+      <div class="detail-card-main">
+        <div>
+          <h2>BepInEx</h2>
+          <p>
+            {#if selectedGame.bepInEx.status === 'installed'}
+              {$t('steamGames.bepInEx.installedVersion', {
+                version: selectedGame.bepInEx.installedVersion ?? $t('steamGames.detail.unknownVersion')
+              })}
+            {:else if selectedGame.bepInEx.status === 'installable'}
+              {$t('steamGames.detail.bepInExReady')}
+            {:else}
+              {reasonLabel(selectedGame.bepInEx.reason)}
+            {/if}
+          </p>
+        </div>
+        <div class="detail-actions">
+          {#if selectedGame.bepInEx.status === 'installable'}
+            <button class="primary-action" type="button" disabled={actionBusy || busyModId !== undefined} on:click={prepareBepInstall}>
+              {$t('steamGames.bepInEx.install')}
+            </button>
+          {:else if selectedGame.bepInEx.status === 'installed' && selectedGame.bepInEx.managedByGameTweaks}
+            <button class="secondary-action danger-action" type="button" disabled={actionBusy || busyModId !== undefined} on:click={prepareBepUninstall}>
+              {$t('steamGames.bepInEx.uninstall')}
+            </button>
+          {:else if selectedGame.bepInEx.status === 'installed'}
+            <span class="managed-note">{$t('steamGames.bepInEx.manualInstall')}</span>
           {/if}
-        </p>
-      </div>
-      <div class="detail-actions">
-        {#if selectedGame.bepInEx.status === 'installable'}
-          <button class="primary-action" type="button" disabled={actionBusy || busyModId !== undefined} on:click={prepareBepInstall}>
-            {$t('steamGames.bepInEx.install')}
-          </button>
-        {:else if selectedGame.bepInEx.status === 'installed' && selectedGame.bepInEx.managedByGameTweaks}
-          <button class="secondary-action danger-action" type="button" disabled={actionBusy || busyModId !== undefined} on:click={prepareBepUninstall}>
-            {$t('steamGames.bepInEx.uninstall')}
-          </button>
-        {:else if selectedGame.bepInEx.status === 'installed'}
-          <span class="managed-note">{$t('steamGames.bepInEx.manualInstall')}</span>
-        {/if}
+        </div>
       </div>
       {#if progress}
         <InstallProgress {progress} />

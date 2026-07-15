@@ -466,6 +466,7 @@ pub struct ModDependency {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ModRelease {
+    repository: String,
     tag: String,
     asset: String,
     sha256: String,
@@ -846,14 +847,16 @@ fn validate_mod_definition(definition: &ModDefinition) -> AppResult<()> {
         || !valid_localized_text(&definition.description)
         || definition.compatibility.architectures.is_empty()
         || definition.compatibility.architectures.len() > 2
+        || !valid_repository(&definition.release.repository)
         || !valid_release_part(&definition.release.tag)
         || !valid_release_part(&definition.release.asset)
+        || !valid_release_part(&catalog_release_tag(definition))
         || !definition
             .release
             .asset
             .to_ascii_lowercase()
             .ends_with(".zip")
-        || !valid_sha256(&definition.release.sha256)
+        || !valid_lower_sha256(&definition.release.sha256)
         || definition.dependencies.len() > 32
         || definition.conflicts.len() > 32
         || definition.config.len() > 512
@@ -1980,7 +1983,8 @@ async fn download_mod(
 ) -> AppResult<PathBuf> {
     let url = Url::parse(&format!(
         "{RELEASE_ROOT}/{}/{}",
-        definition.release.tag, definition.release.asset
+        catalog_release_tag(definition),
+        definition.release.asset
     ))
     .map_err(|_| mod_error("mod_download_invalid", "the mod release URL was invalid"))?;
     let client = catalog_client()?;
@@ -2761,8 +2765,37 @@ fn valid_release_part(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b'+'))
 }
 
+fn valid_repository(value: &str) -> bool {
+    let Some((owner, repository)) = value.split_once('/') else {
+        return false;
+    };
+    !repository.contains('/')
+        && [owner, repository].into_iter().all(|segment| {
+            !segment.is_empty()
+                && segment.len() <= 100
+                && segment
+                    .bytes()
+                    .next()
+                    .is_some_and(|byte| byte.is_ascii_alphanumeric())
+                && segment
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+        })
+}
+
+fn catalog_release_tag(definition: &ModDefinition) -> String {
+    format!("mod-{}-v{}", definition.mod_id, definition.version)
+}
+
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn valid_lower_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
 }
 
 fn valid_localized_text(value: &LocalizedText) -> bool {
@@ -2846,6 +2879,7 @@ mod tests {
                 minimum_agent_version: None,
             },
             release: ModRelease {
+                repository: "gametweaks/test-mod".to_owned(),
                 tag: "test-1.0.0".to_owned(),
                 asset: "test.zip".to_owned(),
                 sha256: "a".repeat(64),
@@ -2911,6 +2945,22 @@ mod tests {
 
         assert!(described.official);
         assert!(!described.external);
+    }
+
+    #[test]
+    fn derives_the_immutable_catalog_release_tag() {
+        let definition = definition("author.mod");
+
+        assert_eq!(catalog_release_tag(&definition), "mod-author.mod-v1.0.0");
+        assert!(validate_mod_definition(&definition).is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_upstream_repositories() {
+        let mut definition = definition("author.mod");
+        definition.release.repository = "https://example.com/mod".to_owned();
+
+        assert!(validate_mod_definition(&definition).is_err());
     }
 
     #[tokio::test]
