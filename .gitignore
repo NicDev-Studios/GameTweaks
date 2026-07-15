@@ -8,6 +8,15 @@ src-tauri/target/
 src-tauri/gen/
 src-tauri/.tauri/
 
+agent/**/bin/
+agent/**/obj/
+agent/vendor/**
+!agent/vendor/.gitkeep
+agent/artifacts/mono/**
+!agent/artifacts/mono/README.txt
+agent/artifacts/il2cpp/**
+!agent/artifacts/il2cpp/README.txt
+
 .DS_Store
 *.log
 *.tmp

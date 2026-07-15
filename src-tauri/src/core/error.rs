@@ -15,6 +15,8 @@ pub enum AppError {
     SteamDiscovery(String),
     #[error("BepInEx error: {message}")]
     BepInEx { code: &'static str, message: String },
+    #[error("game mod error: {message}")]
+    GameMods { code: &'static str, message: String },
     #[error("updater error: {0}")]
     Updater(String),
 }
@@ -34,6 +36,7 @@ impl From<AppError> for ErrorResponse {
             AppError::Network(_) => "network_error",
             AppError::SteamDiscovery(_) => "steam_discovery_error",
             AppError::BepInEx { code, .. } => code,
+            AppError::GameMods { code, .. } => code,
             AppError::Updater(_) => "updater_error",
         };
 

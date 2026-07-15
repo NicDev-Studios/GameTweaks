@@ -37,6 +37,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../agent/artifacts/mono/**/*": "agent/mono/",
+      "../agent/artifacts/il2cpp/**/*": "agent/il2cpp/"
+    },
     "macOS": {
       "signingIdentity": "-"
     },

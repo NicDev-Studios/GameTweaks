@@ -83,4 +83,9 @@
     animation-iteration-count: 1 !important;
   }
 
+  .mod-spinner {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
 }

@@ -7,8 +7,14 @@ GameTweaks is a cross-platform Tauri 2 desktop app for game customization. The c
 ```sh
 corepack enable
 pnpm install
+git submodule update --init
 pnpm dev
 ```
+
+The separately versioned `GameTweaks-Games` catalog is available in `catalog/`.
+Commit and push catalog changes from that directory first, then commit the
+updated submodule reference in this repository. Clone both repositories at once
+with `git clone --recurse-submodules <GameTweaks URL>`.
 
 Local builds identify themselves as `DEV_WORKING`; distributable versions are
 injected only by the release workflow.

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <OutputPath>../../artifacts/mono/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../GameTweaks.Agent.Abstractions/GameTweaks.Agent.Abstractions.csproj" />
+    <ProjectReference Include="../GameTweaks.Agent.Core/GameTweaks.Agent.Core.csproj" />
+    <ProjectReference Include="../UnityEngine.Reference/UnityEngine.Reference.csproj" Private="false" />
+    <Reference Include="BepInEx"><HintPath>../../vendor/mono/core/BepInEx.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

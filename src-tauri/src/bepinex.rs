@@ -32,7 +32,7 @@ const INSTALL_SCAN_MAX_DEPTH: usize = 2;
 const MARKER_MAX_BYTES: usize = 256 * 1024;
 const LOG_MAX_BYTES: usize = 1024 * 1024;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum BepInExRuntime {
     Mono,
@@ -48,7 +48,7 @@ impl BepInExRuntime {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum BepInExArchitecture {
     X86,
@@ -99,6 +99,7 @@ pub struct BepInExGameStatus {
     pub installed_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<BepInExReason>,
+    pub managed_by_game_tweaks: bool,
 }
 
 impl BepInExGameStatus {
@@ -109,6 +110,7 @@ impl BepInExGameStatus {
             architecture: None,
             installed_version: None,
             reason: Some(reason),
+            managed_by_game_tweaks: false,
         }
     }
 
@@ -123,16 +125,17 @@ impl BepInExGameStatus {
             architecture,
             installed_version: None,
             reason: Some(reason),
+            managed_by_game_tweaks: false,
         }
     }
 }
 
 #[derive(Clone, Debug)]
-struct InstallTarget {
-    game_root: PathBuf,
-    executable: PathBuf,
-    runtime: BepInExRuntime,
-    architecture: BepInExArchitecture,
+pub(crate) struct InstallTarget {
+    pub(crate) game_root: PathBuf,
+    pub(crate) executable: PathBuf,
+    pub(crate) runtime: BepInExRuntime,
+    pub(crate) architecture: BepInExArchitecture,
 }
 
 #[derive(Clone, Debug)]
@@ -230,18 +233,18 @@ struct GitHubAsset {
     digest: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct InstallMarker {
-    schema_version: u32,
-    app_id: u32,
-    version: String,
-    runtime: String,
-    architecture: String,
-    source: String,
-    asset_name: String,
-    sha256: String,
-    files: Vec<String>,
+pub(crate) struct InstallMarker {
+    pub(crate) schema_version: u32,
+    pub(crate) app_id: u32,
+    pub(crate) version: String,
+    pub(crate) runtime: String,
+    pub(crate) architecture: String,
+    pub(crate) source: String,
+    pub(crate) asset_name: String,
+    pub(crate) sha256: String,
+    pub(crate) files: Vec<String>,
 }
 
 pub fn analyze_installation(install_directory: &Path) -> BepInExGameStatus {
@@ -260,7 +263,7 @@ pub fn analyze_installation(install_directory: &Path) -> BepInExGameStatus {
     }
 }
 
-fn analyze_windows_installation(
+pub(crate) fn analyze_windows_installation(
     install_directory: &Path,
 ) -> Result<(BepInExGameStatus, InstallTarget), BepInExGameStatus> {
     let install_directory = fs::canonicalize(install_directory)
@@ -299,6 +302,9 @@ fn analyze_windows_installation(
     };
 
     if let Some(installed_version) = installed_bepinex_version(&target.game_root)? {
+        let managed_by_game_tweaks =
+            valid_install_marker(&target.game_root.join("BepInEx/.gametweaks-install.json"))
+                .is_some();
         return Ok((
             BepInExGameStatus {
                 status: BepInExAvailability::Installed,
@@ -306,6 +312,7 @@ fn analyze_windows_installation(
                 architecture: Some(architecture),
                 installed_version,
                 reason: None,
+                managed_by_game_tweaks,
             },
             target,
         ));
@@ -326,6 +333,7 @@ fn analyze_windows_installation(
             architecture: Some(architecture),
             installed_version: None,
             reason: None,
+            managed_by_game_tweaks: false,
         },
         target,
     ))
@@ -551,9 +559,28 @@ fn installed_bepinex_version(
 }
 
 fn read_marker_version(path: &Path) -> Option<String> {
+    let marker = valid_install_marker(path)?;
+    (!marker.version.trim().is_empty()).then_some(marker.version)
+}
+
+pub(crate) fn valid_install_marker(path: &Path) -> Option<InstallMarker> {
     let raw = read_file_limited(path, MARKER_MAX_BYTES)?;
     let marker: InstallMarker = serde_json::from_slice(&raw).ok()?;
-    (!marker.version.trim().is_empty()).then_some(marker.version)
+    if marker.schema_version != 1
+        || marker.version.trim().is_empty()
+        || marker.files.is_empty()
+        || marker.files.len() > ARCHIVE_MAX_ENTRIES
+        || marker.files.iter().any(|file| {
+            let path = Path::new(file);
+            path.is_absolute()
+                || path
+                    .components()
+                    .any(|component| !matches!(component, Component::Normal(_)))
+        })
+    {
+        return None;
+    }
+    Some(marker)
 }
 
 fn read_log_version(path: &Path) -> Option<String> {
@@ -841,7 +868,7 @@ async fn install_prepared(
     })
 }
 
-async fn resolve_game(app_id: u32) -> AppResult<SteamGame> {
+pub(crate) async fn resolve_game(app_id: u32) -> AppResult<SteamGame> {
     let games = tauri::async_runtime::spawn_blocking(|| discover_installed_games(None))
         .await
         .map_err(|_| bepinex_error("bepinex_blocked", "Steam games could not be resolved"))?
@@ -1632,7 +1659,7 @@ fn random_plan_id() -> AppResult<String> {
 }
 
 #[cfg(windows)]
-fn ensure_game_stopped(executable: &Path) -> AppResult<()> {
+pub(crate) fn ensure_game_stopped(executable: &Path) -> AppResult<()> {
     if windows_process_matches(executable)? {
         return Err(bepinex_error(
             "bepinex_game_running",
@@ -1643,7 +1670,7 @@ fn ensure_game_stopped(executable: &Path) -> AppResult<()> {
 }
 
 #[cfg(not(windows))]
-fn ensure_game_stopped(_executable: &Path) -> AppResult<()> {
+pub(crate) fn ensure_game_stopped(_executable: &Path) -> AppResult<()> {
     Ok(())
 }
 
@@ -1940,7 +1967,11 @@ mod tests {
             source: "github-stable".into(),
             asset_name: "package.zip".into(),
             sha256: "a".repeat(64),
-            files: Vec::new(),
+            files: vec![
+                "BepInEx/core/BepInEx.dll".into(),
+                "doorstop_config.ini".into(),
+                "winhttp.dll".into(),
+            ],
         };
         fs::write(
             directory.path().join("BepInEx/.gametweaks-install.json"),

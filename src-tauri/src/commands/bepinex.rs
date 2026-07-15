@@ -3,6 +3,7 @@ use tauri::{AppHandle, State};
 use crate::bepinex::{install, prepare_install, BepInExInstallPlan, BepInExInstallResult};
 use crate::core::error::AppResult;
 use crate::core::state::AppState;
+use crate::game_mods::BepInExUninstallPlan;
 
 #[tauri::command]
 pub async fn prepare_bepinex_install(
@@ -20,4 +21,21 @@ pub async fn install_bepinex(
     plan_id: String,
 ) -> AppResult<BepInExInstallResult> {
     install(&app, &state, plan_id).await
+}
+
+#[tauri::command]
+pub async fn prepare_bepinex_uninstall(
+    state: State<'_, AppState>,
+    app_id: u32,
+) -> AppResult<BepInExUninstallPlan> {
+    crate::game_mods::prepare_bepinex_uninstall(&state, app_id).await
+}
+
+#[tauri::command]
+pub async fn uninstall_bepinex(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    plan_id: String,
+) -> AppResult<()> {
+    crate::game_mods::uninstall_bepinex(&app, &state, plan_id).await
 }
