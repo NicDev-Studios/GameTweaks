@@ -1,0 +1,425 @@
+name: Publish Build
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Git tag used for the GitHub Release
+        required: true
+        type: string
+      release_sha:
+        description: Commit to build and attach to the release
+        required: true
+        type: string
+      development:
+        description: Update the rolling development prerelease
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: publish-${{ inputs.release_tag }}
+  cancel-in-progress: ${{ inputs.development }}
+
+permissions:
+  contents: write
+
+jobs:
+  resolve_version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+    steps:
+      - name: Resolve build version
+        id: version
+        shell: bash
+        env:
+          DEVELOPMENT: ${{ inputs.development }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [[ "$DEVELOPMENT" == "true" ]]; then
+            app_version="0.0.0-dev.$GITHUB_RUN_NUMBER"
+          else
+            app_version="${RELEASE_TAG#v}"
+          fi
+
+          APP_VERSION="$app_version" node -e "const version = process.env.APP_VERSION; const semver = /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/; if (!semver.test(version)) throw new Error('Invalid release version: ' + version);"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+
+  prepare-release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    needs: resolve_version
+    env:
+      APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      IS_DEV_RELEASE: ${{ inputs.development }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Create draft release
+        run: |
+          if [[ "$IS_DEV_RELEASE" == "true" ]]; then
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+              gh api \
+                --method PATCH \
+                "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" \
+                -f sha="$RELEASE_SHA" \
+                -F force=true >/dev/null
+            else
+              gh api \
+                --method POST \
+                "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f ref="refs/tags/$RELEASE_TAG" \
+                -f sha="$RELEASE_SHA" >/dev/null
+            fi
+
+            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release edit "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "GameTweaks Development Build" \
+                --notes "Automated development build $APP_VERSION from main at commit $RELEASE_SHA." \
+                --draft \
+                --prerelease
+
+              while IFS= read -r asset; do
+                gh release delete-asset "$RELEASE_TAG" "$asset" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --yes
+              done < <(gh release view "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[].name')
+            else
+              gh release create "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --target "$RELEASE_SHA" \
+                --title "GameTweaks Development Build" \
+                --notes "Automated development build $APP_VERSION from main at commit $RELEASE_SHA." \
+                --draft \
+                --prerelease
+            fi
+
+            exit 0
+          fi
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          prerelease_args=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "GameTweaks $RELEASE_TAG" \
+            --draft \
+            "${prerelease_args[@]}"
+
+  release:
+    name: Build ${{ matrix.name }}
+    needs:
+      - resolve_version
+      - prepare-release
+    runs-on: ${{ matrix.platform }}
+    env:
+      APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            name: macOS Apple Silicon
+            manifest: macos-aarch64
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            name: macOS Intel
+            manifest: macos-x86_64
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-latest
+            name: Linux
+            manifest: linux-x86_64
+            args: ""
+          - platform: windows-latest
+            name: Windows
+            manifest: windows-x86_64
+            args: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.0
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+
+      - name: Install Linux Tauri dependencies
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install macOS Rust targets
+        if: matrix.platform == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply release version
+        run: node scripts/set-release-version.mjs
+
+      - name: Validate updater public key
+        run: |
+          node -e "const { readFileSync } = require('node:fs'); const config = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')); const pubkey = config.plugins?.updater?.pubkey; if (!pubkey || pubkey === 'REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY') { throw new Error('Replace plugins.updater.pubkey in src-tauri/tauri.conf.json with the public key from pnpm tauri signer generate -w ~/.tauri/gametweaks.key.'); } if (!/^[A-Za-z0-9+/]+={0,2}$/.test(pubkey)) { throw new Error('plugins.updater.pubkey must be a plain base64 Tauri updater public key.'); }"
+
+      - name: Remove stale release outputs
+        shell: bash
+        run: |
+          find src-tauri/target -name latest.json -delete 2>/dev/null || true
+          rm -rf src-tauri/target/release/bundle src-tauri/target/*/release/bundle
+
+      - name: Build Tauri bundles
+        run: pnpm tauri build ${{ matrix.args }}
+        env:
+          GAMETWEAKS_BUILD_VERSION: ${{ env.APP_VERSION }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
+      - name: Build updater manifest
+        shell: bash
+        run: |
+          node <<'NODE'
+          const { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } = require('node:fs');
+          const { basename, join } = require('node:path');
+
+          const releaseTag = process.env.RELEASE_TAG;
+          const repository = process.env.GITHUB_REPOSITORY;
+          const matrixManifest = process.env.MATRIX_MANIFEST;
+          const bundleRoot = 'src-tauri/target';
+          const platforms = {};
+
+          const walk = (dir) => {
+            let entries = [];
+            try {
+              entries = readdirSync(dir);
+            } catch {
+              return [];
+            }
+
+            return entries.flatMap((entry) => {
+              const path = join(dir, entry);
+              const stat = statSync(path);
+              return stat.isDirectory() ? walk(path) : [path];
+            });
+          };
+
+          const files = walk(bundleRoot);
+          const signatureFiles = files.filter((file) => file.endsWith('.sig'));
+
+          const addPlatform = (platform, artifact, signatureFile) => {
+            platforms[platform] = {
+              signature: readFileSync(signatureFile, 'utf8').trim(),
+              url: `https://github.com/${repository}/releases/download/${releaseTag}/${basename(artifact)}`
+            };
+          };
+
+          for (const signatureFile of signatureFiles) {
+            const artifact = signatureFile.slice(0, -4);
+            const artifactName = basename(artifact);
+
+            if (artifactName.endsWith('.app.tar.gz')) {
+              if (matrixManifest === 'macos-aarch64') {
+                addPlatform('darwin-aarch64', artifact, signatureFile);
+                addPlatform('darwin-aarch64-app', artifact, signatureFile);
+              } else if (matrixManifest === 'macos-x86_64') {
+                addPlatform('darwin-x86_64', artifact, signatureFile);
+                addPlatform('darwin-x86_64-app', artifact, signatureFile);
+              }
+            } else if (artifactName.endsWith('.AppImage')) {
+              addPlatform('linux-x86_64', artifact, signatureFile);
+              addPlatform('linux-x86_64-appimage', artifact, signatureFile);
+            } else if (artifactName.endsWith('.deb')) {
+              addPlatform('linux-x86_64-deb', artifact, signatureFile);
+            } else if (artifactName.endsWith('-setup.exe')) {
+              addPlatform('windows-x86_64', artifact, signatureFile);
+              addPlatform('windows-x86_64-nsis', artifact, signatureFile);
+            }
+          }
+
+          if (Object.keys(platforms).length === 0) {
+            throw new Error(`No updater platforms were generated from signatures: ${signatureFiles.join(', ')}`);
+          }
+
+          mkdirSync('updater-manifest', { recursive: true });
+          writeFileSync(
+            'updater-manifest/latest.json',
+            `${JSON.stringify({
+              version: process.env.APP_VERSION,
+              notes: '',
+              pub_date: new Date().toISOString(),
+              platforms
+            }, null, 2)}\n`
+          );
+          console.log(Object.keys(platforms).sort().join('\n'));
+          NODE
+        env:
+          MATRIX_MANIFEST: ${{ matrix.manifest }}
+
+      - name: Upload release assets
+        shell: bash
+        run: |
+          find src-tauri/target -type f \( \
+            -name "*.AppImage" -o \
+            -name "*.AppImage.sig" -o \
+            -name "*.deb" -o \
+            -name "*.deb.sig" -o \
+            -name "*.dmg" -o \
+            -name "*.app.tar.gz" -o \
+            -name "*.app.tar.gz.sig" -o \
+            -name "*-setup.exe" -o \
+            -name "*-setup.exe.sig" \
+          \) > release-assets.txt
+
+          if [ ! -s release-assets.txt ]; then
+            echo "No release assets found"
+            exit 1
+          fi
+
+          while IFS= read -r asset; do
+            gh release upload "$RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
+          done < release-assets.txt
+
+      - name: Upload updater manifest artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: updater-manifest-${{ matrix.manifest }}
+          path: updater-manifest/latest.json
+
+  updater-manifest:
+    name: Publish updater manifest
+    runs-on: ubuntu-latest
+    needs:
+      - resolve_version
+      - release
+    env:
+      APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Download updater manifests
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: updater-manifest-*
+          path: updater-manifests
+
+      - name: Merge updater manifests
+        run: |
+          node <<'NODE'
+          const { readdirSync, readFileSync, writeFileSync, mkdirSync } = require('node:fs');
+          const { join } = require('node:path');
+
+          const root = 'updater-manifests';
+          const files = readdirSync(root)
+            .map((dir) => join(root, dir, 'latest.json'));
+
+          if (files.length === 0) {
+            throw new Error('No updater manifest artifacts were downloaded');
+          }
+
+          let merged;
+          for (const file of files) {
+            const manifest = JSON.parse(readFileSync(file, 'utf8'));
+            if (!manifest.platforms || Object.keys(manifest.platforms).length === 0) {
+              throw new Error(`${file} has no platforms`);
+            }
+
+            if (!merged) {
+              merged = {
+                version: manifest.version,
+                notes: manifest.notes ?? '',
+                pub_date: manifest.pub_date,
+                platforms: {}
+              };
+            }
+
+            Object.assign(merged.platforms, manifest.platforms);
+          }
+
+          const alias = (from, to) => {
+            if (merged.platforms[from] && !merged.platforms[to]) {
+              merged.platforms[to] = merged.platforms[from];
+            }
+          };
+
+          alias('darwin-aarch64', 'darwin-aarch64-app');
+          alias('darwin-aarch64-app', 'darwin-aarch64');
+          alias('darwin-x86_64', 'darwin-x86_64-app');
+          alias('darwin-x86_64-app', 'darwin-x86_64');
+
+          const required = [
+            ['darwin-aarch64', 'darwin-aarch64-app'],
+            ['darwin-x86_64', 'darwin-x86_64-app'],
+            ['linux-x86_64', 'linux-x86_64-appimage', 'linux-x86_64-deb'],
+            ['windows-x86_64', 'windows-x86_64-nsis']
+          ];
+
+          for (const group of required) {
+            if (!group.some((platform) => merged.platforms[platform])) {
+              throw new Error(`Updater manifest missing platform group: ${group.join(', ')}`);
+            }
+          }
+
+          mkdirSync('merged-updater-manifest', { recursive: true });
+          writeFileSync(
+            'merged-updater-manifest/latest.json',
+            `${JSON.stringify(merged, null, 2)}\n`
+          );
+          console.log(Object.keys(merged.platforms).sort().join('\n'));
+          NODE
+
+      - name: Upload merged updater manifest
+        run: gh release upload "$RELEASE_TAG" merged-updater-manifest/latest.json --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Verify published updater manifest
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json --dir verify-updater-manifest --clobber
+          node -e "const manifest = require('./verify-updater-manifest/latest.json'); const keys = Object.keys(manifest.platforms || {}); for (const key of ['darwin-aarch64', 'darwin-aarch64-app', 'darwin-x86_64', 'darwin-x86_64-app']) { if (!keys.includes(key)) throw new Error('Published updater manifest missing ' + key); } console.log(keys.sort().join('\n'));"
+
+      - name: Publish version release
+        shell: bash
+        run: |
+          prerelease_args=()
+          if [[ "$RELEASE_TAG" == "DEV_RELEASE" || "$RELEASE_TAG" == *-* ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            "${prerelease_args[@]}"

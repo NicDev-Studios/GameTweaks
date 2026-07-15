@@ -27,19 +27,22 @@ The checked-in project version is the non-release placeholder `0.0.0-dev`.
 Local builds, including `pnpm dev`, display `DEV_WORKING` and do not query the
 automatic updater.
 
-The release workflow is the only source of distributable versions. A version
-tag such as `v1.0.0-beta.2` produces application and updater artifacts with
-version `1.0.0-beta.2`. Rolling `DEV_RELEASE` builds receive a unique CI version
-such as `0.0.0-dev.123`, but remain excluded from the application updater.
+GitHub Actions is the only source of distributable versions. A version tag such
+as `v1.0.0-beta.2` produces application and updater artifacts with version
+`1.0.0-beta.2`. Rolling `DEV_RELEASE` builds receive a unique CI version such as
+`0.0.0-dev.123`, but remain excluded from the application updater.
 
 ## Publishing
 
 ### Development builds
 
-After the CI workflow succeeds on `main`, the release workflow updates the
-`DEV_RELEASE` tag and its GitHub Prerelease from the exact commit checked by
-CI. Failed or cancelled CI runs do not publish a development build. The release
-is rebuilt for every supported platform and is intended only for testing the
+The `Publish Dev Build` CI job is visible as soon as a workflow starts. It waits
+for the required CI checks, runs only for pushes to `main`, and updates the
+`DEV_RELEASE` tag and its GitHub Prerelease from the exact checked commit. On
+pull requests it is skipped, and failed or cancelled CI runs do not publish a
+development build. Pull requests use unsigned platform bundle checks; `main`
+builds the signed platform bundles directly in the publishing job to avoid
+building every platform twice. The release is intended only for testing the
 newest reviewed development state. Its permanent release page is:
 
 ```text
@@ -67,11 +70,12 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The release workflow builds macOS Apple Silicon, macOS Intel, Windows, and
-Linux bundles, signs updater artifacts, and attaches `latest.json` to the
-GitHub Release. macOS is built per architecture so the updater manifest contains
-the `darwin-aarch64` and `darwin-x86_64` platform entries expected by packaged
-apps. Packaged GameTweaks builds check:
+The release workflow reacts only to beta and stable version tags. It uses the
+same publishing workflow as the CI development job to build macOS Apple
+Silicon, macOS Intel, Windows, and Linux bundles, sign updater artifacts, and
+attach `latest.json` to the GitHub Release. macOS is built per architecture so
+the updater manifest contains the `darwin-aarch64` and `darwin-x86_64` platform
+entries expected by packaged apps. Packaged GameTweaks builds check:
 
 ```text
 https://github.com/NicDev-Studios/GameTweaks/releases/latest/download/latest.json

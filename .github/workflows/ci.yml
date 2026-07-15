@@ -134,6 +134,7 @@ jobs:
 
   tauri-bundles:
     name: Tauri Bundles (${{ matrix.name }})
+    if: github.event_name == 'pull_request'
     runs-on: ${{ matrix.platform }}
     needs:
       - frontend
@@ -195,3 +196,20 @@ jobs:
 
       - name: Build Tauri bundles
         run: pnpm tauri build --config src-tauri/tauri.pr.conf.json ${{ matrix.args }}
+
+  publish-dev-build:
+    name: Publish Dev Build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - spelling
+      - frontend
+      - rust
+      - tauri-build
+    permissions:
+      contents: write
+    uses: ./.github/workflows/publish.yml
+    with:
+      release_tag: DEV_RELEASE
+      release_sha: ${{ github.sha }}
+      development: true
+    secrets: inherit
