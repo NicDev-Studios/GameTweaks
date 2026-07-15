@@ -6,6 +6,19 @@ Use the checks documented in `AGENTS.md` for the area you change. Keep Rust resp
 
 The interface should remain compact, neutral, and suitable for a desktop utility. Do not add fake feature data or broad placeholder dashboards.
 
+## Contribution quality and automated assistance
+
+Automated tools may assist a contribution, but the contributor remains fully
+responsible for every submitted line and claim. Read, understand, and manually
+verify generated or transformed output before submitting it. Disclose material
+automated assistance in the pull request template and list only validation that
+you actually ran.
+
+Fabricated data, guessed contracts, generic filler, unrelated churn, false test
+claims, and blindly selected checklists are grounds for closing a contribution.
+Reviewers judge objective quality and verification; they must not accuse someone
+of using AI based only on writing or coding style.
+
 ## Branch workflow
 
 `main` is the default integration branch and contains the newest reviewed development state. Stable versions are represented by immutable version tags and GitHub Releases, not by a separate permanent stable branch.

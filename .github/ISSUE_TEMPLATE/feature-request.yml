@@ -1,0 +1,75 @@
+name: Feature request
+description: Propose a focused GameTweaks application improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the concrete user problem, not only the desired control or screen.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain the smallest useful workflow and its expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: privileged-scope
+    attributes:
+      label: Does this require privileged behavior?
+      description: Select every applicable category in the explanation below.
+      options:
+        - No privileged behavior
+        - Filesystem changes
+        - Network access
+        - Process or IPC access
+        - Tauri permission changes
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and data impact
+      description: Explain affected files, network origins, processes, permissions, or sensitive data. Write "None" when not applicable.
+    validations:
+      required: true
+  - type: dropdown
+    id: automated-assistance
+    attributes:
+      label: Automated assistance
+      description: State whether generated text or automated analysis was used to prepare this request.
+      options:
+        - No generated content was used
+        - Automated assistance was used and I manually verified every claim
+        - I am unsure whether generated content was used
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I checked that this is not a game or mod catalog request.
+          required: true
+        - label: I did not use fake product data to demonstrate the request.
+          required: true
+        - label: I understand and manually reviewed every submitted claim.
+          required: true
+  - type: checkboxes
+    id: attention
+    attributes:
+      label: Attention check
+      description: Leave the following option unchecked. It identifies blind select-all submissions.
+      options:
+        - label: I selected every checkbox without reading it.
+          required: false

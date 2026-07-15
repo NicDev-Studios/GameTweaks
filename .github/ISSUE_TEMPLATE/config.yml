@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/NicDev-Studios/GameTweaks/security/advisories/new
+    about: Do not publish vulnerabilities, local paths, credentials, or Agent secrets in a public issue.
+  - name: Game and mod catalog issues
+    url: https://github.com/NicDev-Studios/GameTweaks-Games/issues/new/choose
+    about: Request game support or report incorrect catalog metadata in the catalog repository.

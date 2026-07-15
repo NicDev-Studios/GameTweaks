@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a reproducible GameTweaks application problem.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, IPC secrets, or unnecessarily complete local paths. Use the private security link for vulnerabilities.
+  - type: input
+    id: version
+    attributes:
+      label: GameTweaks version
+      placeholder: "Example: 0.1.0 or DEV_WORKING"
+    validations:
+      required: true
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: steam-app-id
+    attributes:
+      label: Steam App ID
+      description: Required only when the problem affects a specific game.
+      placeholder: "Example: 123456"
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and any visible error code.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Include only the relevant excerpt and redact usernames, local paths, credentials, and secrets.
+      render: text
+  - type: dropdown
+    id: automated-assistance
+    attributes:
+      label: Automated assistance
+      description: State whether generated text or automated analysis was used to prepare this report.
+      options:
+        - No generated content was used
+        - Automated assistance was used and I manually verified every claim
+        - I am unsure whether generated content was used
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I closed the affected game before retrying file-changing actions.
+          required: false
+        - label: I provided factual reproduction details rather than guessed internals.
+          required: true
+        - label: I understand and manually reviewed every submitted claim.
+          required: true
+  - type: checkboxes
+    id: attention
+    attributes:
+      label: Attention check
+      description: Leave the following option unchecked. It identifies blind select-all submissions.
+      options:
+        - label: I selected every checkbox without reading it.
+          required: false

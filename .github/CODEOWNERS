@@ -3,6 +3,9 @@
 # updater behavior, persistent configuration, and dependency resolution.
 
 /.github/workflows/ @NicDevTV
+/.github/ISSUE_TEMPLATE/ @NicDevTV
+/.github/instructions/ @NicDevTV
+/.github/PULL_REQUEST_TEMPLATE.md @NicDevTV
 /.github/CODEOWNERS @NicDevTV
 /.github/copilot-instructions.md @NicDevTV
 /LICENSE @NicDevTV
