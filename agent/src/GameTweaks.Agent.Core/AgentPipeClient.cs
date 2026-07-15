@@ -30,6 +30,20 @@ public static class AgentBootstrap
             return _client;
         }
     }
+
+    public static string ResolveMarkerPath(string pluginPath)
+    {
+        if (string.IsNullOrWhiteSpace(pluginPath))
+            throw new ArgumentException("The BepInEx plugin path is missing.", nameof(pluginPath));
+        var root = Path.GetFullPath(pluginPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return string.Concat(
+            root,
+            Path.DirectorySeparatorChar,
+            "GameTweaks.Agent",
+            Path.DirectorySeparatorChar,
+            ".gametweaks-agent.json");
+    }
 }
 
 public sealed class AgentPipeClient : IDisposable
@@ -82,13 +96,61 @@ public sealed class AgentPipeClient : IDisposable
                     RunConnected(pipe);
                 }
             }
-            catch when (!_shutdown.WaitOne(0))
+            catch (TimeoutException error)
             {
-                if (_shutdown.WaitOne(delayMilliseconds))
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
                     return;
-                delayMilliseconds = Math.Min(delayMilliseconds * 2, 30000);
+            }
+            catch (IOException error)
+            {
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
+                    return;
+            }
+            catch (UnauthorizedAccessException error)
+            {
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
+                    return;
+            }
+            catch (JsonException error)
+            {
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
+                    return;
+            }
+            catch (KeyNotFoundException error)
+            {
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
+                    return;
+            }
+            catch (InvalidOperationException error)
+            {
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
+                    return;
+            }
+            catch (FormatException error)
+            {
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
+                    return;
+            }
+            catch (CryptographicException error)
+            {
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
+                    return;
             }
         }
+    }
+
+    private bool WaitBeforeReconnect(Exception error, ref int delayMilliseconds)
+    {
+        if (_shutdown.WaitOne(0))
+            return false;
+        Trace.TraceWarning(
+            "GameTweaks Agent connection failed ({0}): {1}",
+            error.GetType().Name,
+            error.Message);
+        if (_shutdown.WaitOne(delayMilliseconds))
+            return false;
+        delayMilliseconds = Math.Min(delayMilliseconds * 2, 30000);
+        return true;
     }
 
     private void Authenticate(Stream pipe)
@@ -166,12 +228,39 @@ public sealed class AgentPipeClient : IDisposable
                     mods
                 });
             }
-            catch
+            catch (IOException error)
             {
+                TraceSnapshotFailure(error);
+                return;
+            }
+            catch (ObjectDisposedException error)
+            {
+                TraceSnapshotFailure(error);
+                return;
+            }
+            catch (InvalidOperationException error)
+            {
+                TraceSnapshotFailure(error);
+                return;
+            }
+            catch (JsonException error)
+            {
+                TraceSnapshotFailure(error);
+                return;
+            }
+            catch (NotSupportedException error)
+            {
+                TraceSnapshotFailure(error);
                 return;
             }
         }
     }
+
+    private static void TraceSnapshotFailure(Exception error) =>
+        Trace.TraceWarning(
+            "GameTweaks Agent snapshot writer stopped ({0}): {1}",
+            error.GetType().Name,
+            error.Message);
 
     private void HandleMessage(Stream pipe, JsonElement message)
     {

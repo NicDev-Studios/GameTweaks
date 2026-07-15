@@ -67,12 +67,10 @@ public sealed class AgentRegistry : IGameTweaksAgent
         ValidateConfigName(metadata.Section, nameof(metadata.Section));
         ValidateConfigName(metadata.Key, nameof(metadata.Key));
         ValidateText(metadata.Label.En, 512, nameof(metadata.Label));
-        if (metadata.Kind is SettingKind.Integer or SettingKind.Decimal)
-        {
-            if (metadata.Minimum is null || metadata.Maximum is null || metadata.Step is null ||
-                metadata.Minimum > metadata.Maximum || metadata.Step <= 0)
-                throw new ArgumentException("Numeric settings need a valid range and step.");
-        }
+        if (metadata.Kind is SettingKind.Integer or SettingKind.Decimal &&
+            (metadata.Minimum is null || metadata.Maximum is null || metadata.Step is null ||
+             metadata.Minimum > metadata.Maximum || metadata.Step <= 0))
+            throw new ArgumentException("Numeric settings need a valid range and step.");
         if (metadata.Kind == SettingKind.String && metadata.MaximumLength is not > 0 and <= 65535)
             throw new ArgumentException("String settings need a maximum length.");
         if (metadata.Kind is SettingKind.SingleSelect or SettingKind.MultiSelect &&
@@ -116,7 +114,7 @@ public sealed class AgentRegistry : IGameTweaksAgent
                               metadata.MaximumLength is int maximumLength &&
                               text.Length <= maximumLength,
         SettingKind.Integer => TryNumber(metadata.DefaultValue, out var integer) &&
-                               Math.Truncate(integer) == integer && InRange(metadata, integer),
+                               IsWholeNumber(integer) && InRange(metadata, integer),
         SettingKind.Decimal => TryNumber(metadata.DefaultValue, out var number) &&
                                !double.IsNaN(number) && !double.IsInfinity(number) &&
                                InRange(metadata, number),
@@ -157,6 +155,10 @@ public sealed class AgentRegistry : IGameTweaksAgent
         metadata.Minimum is double minimum && metadata.Maximum is double maximum &&
         metadata.Step is double step && step > 0 && value >= minimum && value <= maximum &&
         Math.Abs(((value - minimum) / step) - Math.Round((value - minimum) / step)) <= 0.000000001;
+
+    private static bool IsWholeNumber(double value) =>
+        !double.IsNaN(value) && !double.IsInfinity(value) &&
+        Math.Abs(value - Math.Truncate(value)) <= double.Epsilon;
 
     private static bool IsAsciiLetterOrDigit(char value) =>
         value is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9';

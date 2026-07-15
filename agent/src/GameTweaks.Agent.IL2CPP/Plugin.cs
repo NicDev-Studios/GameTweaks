@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Security;
+using System.Text.Json;
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using GameTweaks.Agent.Core;
@@ -15,15 +17,38 @@ public sealed class Plugin : BasePlugin
     {
         try
         {
-            var marker = Path.Combine(Paths.PluginPath, "GameTweaks.Agent", ".gametweaks-agent.json");
+            var marker = AgentBootstrap.ResolveMarkerPath(Paths.PluginPath);
             _agent = AgentBootstrap.Start(marker, "il2Cpp");
             Log.LogInfo("GameTweaks Agent loaded. Waiting for the desktop app.");
         }
-        catch (Exception error)
+        catch (IOException error)
         {
-            Log.LogError($"GameTweaks Agent could not start: {error.Message}");
+            LogStartupError(error);
+        }
+        catch (UnauthorizedAccessException error)
+        {
+            LogStartupError(error);
+        }
+        catch (JsonException error)
+        {
+            LogStartupError(error);
+        }
+        catch (ArgumentException error)
+        {
+            LogStartupError(error);
+        }
+        catch (FormatException error)
+        {
+            LogStartupError(error);
+        }
+        catch (SecurityException error)
+        {
+            LogStartupError(error);
         }
     }
+
+    private static void LogStartupError(Exception error) =>
+        Log.LogError($"GameTweaks Agent could not start ({error.GetType().Name}): {error.Message}");
 
     public override bool Unload()
     {

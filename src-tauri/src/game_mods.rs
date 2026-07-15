@@ -641,10 +641,9 @@ struct ModProgress {
 }
 
 pub async fn get_support(app: &AppHandle, state: &AppState, app_id: u32) -> AppResult<GameSupport> {
-    let _game = resolve_game(app_id).await?;
+    let game = resolve_game(app_id).await?;
     match load_catalog(app, state, app_id).await {
         Ok((catalog, definitions, cached)) => {
-            let game = resolve_game(app_id).await?;
             let target = analyze_windows_installation(&game.install_directory)
                 .ok()
                 .map(|(_, target)| target);
@@ -2293,11 +2292,34 @@ fn update_config_file(path: &Path, changes: &[(&ConfigField, String)]) -> AppRes
             }
         }
         if !replaced {
-            if !lines.is_empty() && !lines.last().is_some_and(String::is_empty) {
-                lines.push(String::new());
+            let section_end = lines
+                .iter()
+                .position(|line| {
+                    let trimmed = line.trim();
+                    trimmed.starts_with('[')
+                        && trimmed.ends_with(']')
+                        && trimmed[1..trimmed.len() - 1]
+                            .trim()
+                            .eq_ignore_ascii_case(wanted_section)
+                })
+                .map(|section_start| {
+                    lines[section_start + 1..]
+                        .iter()
+                        .position(|line| {
+                            let trimmed = line.trim();
+                            trimmed.starts_with('[') && trimmed.ends_with(']')
+                        })
+                        .map_or(lines.len(), |offset| section_start + 1 + offset)
+                });
+            if let Some(section_end) = section_end {
+                lines.insert(section_end, format!("{wanted_key} = {value}"));
+            } else {
+                if !lines.is_empty() && !lines.last().is_some_and(String::is_empty) {
+                    lines.push(String::new());
+                }
+                lines.push(format!("[{wanted_section}]"));
+                lines.push(format!("{wanted_key} = {value}"));
             }
-            lines.push(format!("[{wanted_section}]"));
-            lines.push(format!("{wanted_key} = {value}"));
         }
     }
     if let Some(parent) = path.parent() {
@@ -3026,6 +3048,47 @@ mod tests {
         assert!(updated.contains("# comment"));
         assert!(updated.contains("Enabled = true"));
         assert!(updated.contains("Unknown = keep"));
+    }
+
+    #[test]
+    fn config_writer_reuses_an_existing_section_for_multiple_new_fields() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("plugin.cfg");
+        fs::write(&path, "[General]\nUnknown = keep\n[Other]\nValue = keep\n").unwrap();
+        let first = ConfigField::Boolean {
+            id: "first".to_owned(),
+            section: "General".to_owned(),
+            key: "First".to_owned(),
+            label: text("First"),
+            description: None,
+            locked: false,
+            default: false,
+            apply_mode: ConfigApplyMode::Live,
+            display: BooleanDisplay::Switch,
+        };
+        let second = ConfigField::Boolean {
+            id: "second".to_owned(),
+            section: "General".to_owned(),
+            key: "Second".to_owned(),
+            label: text("Second"),
+            description: None,
+            locked: false,
+            default: false,
+            apply_mode: ConfigApplyMode::Live,
+            display: BooleanDisplay::Switch,
+        };
+
+        update_config_file(
+            &path,
+            &[(&first, "true".to_owned()), (&second, "false".to_owned())],
+        )
+        .unwrap();
+
+        let updated = fs::read_to_string(path).unwrap();
+        assert_eq!(updated.matches("[General]").count(), 1);
+        assert!(updated.contains("First = true"));
+        assert!(updated.contains("Second = false"));
+        assert!(updated.find("Second = false").unwrap() < updated.find("[Other]").unwrap());
     }
 
     #[test]

@@ -387,6 +387,7 @@
 </script>
 
 {#if selectedGame}
+  {@const selectedRuntimeLabel = runtimeLabel(selectedGame)}
   <section class="single-panel glass-panel game-detail" aria-busy={supportLoading || actionBusy || busyModId !== undefined}>
     <button class="detail-back" type="button" on:click={closeGame}>
       <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
@@ -397,7 +398,7 @@
       <div>
         <p class="eyebrow">{$t('steamGames.detail.eyebrow')}</p>
         <h1>{selectedGame.name}</h1>
-        {#if runtimeLabel(selectedGame)}<p>{runtimeLabel(selectedGame)}</p>{/if}
+        {#if selectedRuntimeLabel}<p>{selectedRuntimeLabel}</p>{/if}
       </div>
       {#if support}
         <span class:connected={support.agentStatus === 'connected'} class="agent-state">
@@ -627,11 +628,12 @@
     {:else}
       <ul class="game-list" aria-label={$t('steamGames.listLabel')}>
         {#each games as game (game.appId)}
+          {@const gameRuntimeLabel = runtimeLabel(game)}
           <li>
             <button class="game-row" type="button" on:click={() => openGame(game)}>
               <span class="game-details">
                 <strong>{game.name}</strong>
-                {#if runtimeLabel(game)}<span class="game-runtime">{runtimeLabel(game)}</span>{/if}
+                {#if gameRuntimeLabel}<span class="game-runtime">{gameRuntimeLabel}</span>{/if}
                 {#if game.bepInEx.status === 'unsupported' || game.bepInEx.status === 'blocked'}
                   <span class:blocked={game.bepInEx.status === 'blocked'} class="game-compatibility">{reasonLabel(game.bepInEx.reason)}</span>
                 {/if}
