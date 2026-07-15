@@ -156,13 +156,12 @@ pub struct AgentState {
 
 pub fn start_server(app: AppHandle) {
     #[cfg(windows)]
-    std::thread::Builder::new()
+    if let Err(error) = std::thread::Builder::new()
         .name("gametweaks-agent-pipe".to_owned())
         .spawn(move || windows_pipe::run(app))
-        .unwrap_or_else(|error| {
-            tracing::error!(%error, "failed to start the GameTweaks agent pipe server");
-            std::thread::spawn(|| {});
-        });
+    {
+        tracing::error!(%error, "failed to start the GameTweaks agent pipe server");
+    }
 
     #[cfg(not(windows))]
     let _ = app;
