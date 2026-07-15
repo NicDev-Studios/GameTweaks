@@ -3,6 +3,7 @@ pub mod config;
 pub mod core;
 pub mod steam;
 pub mod updater;
+pub mod version;
 
 use crate::commands::app::{
     check_for_update, download_and_install_update, get_app_overview, get_language_preference,

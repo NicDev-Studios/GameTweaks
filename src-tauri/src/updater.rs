@@ -11,6 +11,7 @@ use crate::core::state::AppState;
 
 const GITHUB_RELEASES_API_URL: &str =
     "https://api.github.com/repos/NicDev-Studios/GameTweaks/releases";
+const DEVELOPMENT_RELEASE_TAG: &str = "DEV_RELEASE";
 const UPDATER_MANIFEST_ASSET_NAME: &str = "latest.json";
 const UPDATE_PROGRESS_EVENT: &str = "gametweaks-update-progress";
 
@@ -47,6 +48,11 @@ struct GitHubReleaseAsset {
 }
 
 pub async fn check_for_update(app: &AppHandle, state: &AppState) -> AppResult<Option<UpdateInfo>> {
+    if !crate::version::is_release_build() {
+        *state.pending_update.lock().await = None;
+        return Ok(None);
+    }
+
     let channel = state.config.read().await.update_channel;
     let endpoint = update_endpoint(channel).await?;
     let updater = app
@@ -138,6 +144,7 @@ async fn update_endpoint(channel: UpdateChannel) -> AppResult<Url> {
         .iter()
         .find(|release| {
             !release.draft
+                && release.tag_name != DEVELOPMENT_RELEASE_TAG
                 && match channel {
                     UpdateChannel::Stable => !release.prerelease,
                     UpdateChannel::Beta => release.prerelease,

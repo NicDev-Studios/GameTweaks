@@ -8,15 +8,15 @@ The interface should remain compact, neutral, and suitable for a desktop utility
 
 ## Branch workflow
 
-`main` contains the current stable version of GameTweaks. Contributors should not open feature pull requests directly against `main`.
+`main` is the default integration branch and contains the newest reviewed development state. Stable versions are represented by immutable version tags and GitHub Releases, not by a separate permanent stable branch.
 
-Create a short-lived branch from `development` using a descriptive prefix:
+Create a short-lived branch from `main` using a descriptive prefix:
 
 - `feature/<name>` for new functionality
 - `fix/<name>` for bug fixes
 - `docs/<name>` for documentation-only changes
 - `chore/<name>` for maintenance work
 
-Open the pull request against `development`. This branch is the integration stage for the next version: contributions are combined, reviewed, and tested there before they become stable. Beta versions are built from a tested `development` state and use prerelease versions and tags such as `0.1.0-beta.1` and `v0.1.0-beta.1`.
+Open the pull request against `main`. Every push to `main` updates the rolling `DEV_RELEASE` GitHub Prerelease for development-only testing. This tag is movable and must not be treated as a stable or reproducible version.
 
-Once the beta has been tested and is ready for a stable release, `development` is merged into `main`. Stable release tags such as `v0.1.0` must be created from `main`. After a direct hotfix to `main`, merge the same change back into `development` so the branches do not diverge.
+For a short beta cycle, prerelease tags such as `v1.0.0-beta.1` may be created directly from a tested commit on `main`. If a version needs a longer stabilization period while new work continues on `main`, create a temporary branch such as `release/1.0.0`. Publish its betas as `v1.0.0-beta.1`, `v1.0.0-beta.2`, and so on, then publish the stable `v1.0.0` tag from the tested release branch. Merge stabilization fixes back into `main` and delete the release branch after publication.

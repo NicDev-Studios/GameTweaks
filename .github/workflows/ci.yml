@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v7.0.0
 
       - name: Check spelling
-        uses: crate-ci/typos@master
+        uses: crate-ci/typos@v1.48.0
 
   frontend:
     name: Frontend

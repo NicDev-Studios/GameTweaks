@@ -24,7 +24,7 @@ pub async fn get_app_overview(state: State<'_, AppState>) -> AppResult<AppOvervi
 
     Ok(AppOverview {
         name: "GameTweaks",
-        version: env!("CARGO_PKG_VERSION"),
+        version: crate::version::current(),
         config_version: config.version,
     })
 }

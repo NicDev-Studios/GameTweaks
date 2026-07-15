@@ -1160,7 +1160,7 @@ dependencies = [
 
 [[package]]
 name = "gametweaks"
-version = "0.0.1-beta.1"
+version = "0.0.0-dev"
 dependencies = [
  "reqwest 0.12.28",
  "serde",

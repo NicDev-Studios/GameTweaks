@@ -1,6 +1,6 @@
 [package]
 name = "gametweaks"
-version = "0.0.1-beta.1"
+version = "0.0.0-dev"
 description = "A desktop app for game tweaks."
 authors = ["GameTweaks contributors"]
 license = "AGPL-3.0-only"

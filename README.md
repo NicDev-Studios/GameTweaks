@@ -10,6 +10,9 @@ pnpm install
 pnpm dev
 ```
 
+Local builds identify themselves as `DEV_WORKING`; distributable versions are
+injected only by the release workflow.
+
 ## Checks
 
 ```sh

@@ -2,22 +2,95 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*.*.*"
+
+concurrency:
+  group: release-${{ github.ref == 'refs/heads/main' && 'DEV_RELEASE' || github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
 permissions:
   contents: write
 
 jobs:
+  resolve_version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+    steps:
+      - name: Resolve build version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == "refs/heads/main" ]]; then
+            app_version="0.0.0-dev.$GITHUB_RUN_NUMBER"
+          else
+            app_version="${GITHUB_REF_NAME#v}"
+          fi
+
+          APP_VERSION="$app_version" node -e "const version = process.env.APP_VERSION; const semver = /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$/; if (!semver.test(version)) throw new Error('Invalid release version: ' + version);"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+
   prepare-release:
     name: Prepare release
     runs-on: ubuntu-latest
+    needs: resolve_version
     env:
-      RELEASE_TAG: ${{ github.ref_name }}
+      APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
+      RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && 'DEV_RELEASE' || github.ref_name }}
+      RELEASE_SHA: ${{ github.sha }}
+      IS_DEV_RELEASE: ${{ github.ref == 'refs/heads/main' }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Create draft release
         run: |
+          if [[ "$IS_DEV_RELEASE" == "true" ]]; then
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+              gh api \
+                --method PATCH \
+                "repos/$GITHUB_REPOSITORY/git/refs/tags/$RELEASE_TAG" \
+                -f sha="$RELEASE_SHA" \
+                -F force=true >/dev/null
+            else
+              gh api \
+                --method POST \
+                "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f ref="refs/tags/$RELEASE_TAG" \
+                -f sha="$RELEASE_SHA" >/dev/null
+            fi
+
+            if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release edit "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "GameTweaks Development Build" \
+                --notes "Automated development build $APP_VERSION from main at commit $RELEASE_SHA." \
+                --draft \
+                --prerelease
+
+              while IFS= read -r asset; do
+                gh release delete-asset "$RELEASE_TAG" "$asset" \
+                  --repo "$GITHUB_REPOSITORY" \
+                  --yes
+              done < <(gh release view "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json assets \
+                --jq '.assets[].name')
+            else
+              gh release create "$RELEASE_TAG" \
+                --repo "$GITHUB_REPOSITORY" \
+                --target "$RELEASE_SHA" \
+                --title "GameTweaks Development Build" \
+                --notes "Automated development build $APP_VERSION from main at commit $RELEASE_SHA." \
+                --draft \
+                --prerelease
+            fi
+
+            exit 0
+          fi
+
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             exit 0
           fi
@@ -35,10 +108,13 @@ jobs:
 
   release:
     name: Build ${{ matrix.name }}
-    needs: prepare-release
+    needs:
+      - resolve_version
+      - prepare-release
     runs-on: ${{ matrix.platform }}
     env:
-      RELEASE_TAG: ${{ github.ref_name }}
+      APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
+      RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && 'DEV_RELEASE' || github.ref_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       fail-fast: false
@@ -99,6 +175,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Apply release version
+        run: node scripts/set-release-version.mjs
+
       - name: Validate updater public key
         run: |
           node -e "const { readFileSync } = require('node:fs'); const config = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')); const pubkey = config.plugins?.updater?.pubkey; if (!pubkey || pubkey === 'REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY') { throw new Error('Replace plugins.updater.pubkey in src-tauri/tauri.conf.json with the public key from pnpm tauri signer generate -w ~/.tauri/gametweaks.key.'); } if (!/^[A-Za-z0-9+/]+={0,2}$/.test(pubkey)) { throw new Error('plugins.updater.pubkey must be a plain base64 Tauri updater public key.'); }"
@@ -112,6 +191,7 @@ jobs:
       - name: Build Tauri bundles
         run: pnpm tauri build ${{ matrix.args }}
         env:
+          GAMETWEAKS_BUILD_VERSION: ${{ env.APP_VERSION }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
       - name: Build updater manifest
@@ -183,7 +263,7 @@ jobs:
           writeFileSync(
             'updater-manifest/latest.json',
             `${JSON.stringify({
-              version: require('./src-tauri/tauri.conf.json').version,
+              version: process.env.APP_VERSION,
               notes: '',
               pub_date: new Date().toISOString(),
               platforms
@@ -227,9 +307,12 @@ jobs:
   updater-manifest:
     name: Publish updater manifest
     runs-on: ubuntu-latest
-    needs: release
+    needs:
+      - resolve_version
+      - release
     env:
-      RELEASE_TAG: ${{ github.ref_name }}
+      APP_VERSION: ${{ needs.resolve_version.outputs.app_version }}
+      RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && 'DEV_RELEASE' || github.ref_name }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
@@ -313,4 +396,14 @@ jobs:
           node -e "const manifest = require('./verify-updater-manifest/latest.json'); const keys = Object.keys(manifest.platforms || {}); for (const key of ['darwin-aarch64', 'darwin-aarch64-app', 'darwin-x86_64', 'darwin-x86_64-app']) { if (!keys.includes(key)) throw new Error('Published updater manifest missing ' + key); } console.log(keys.sort().join('\n'));"
 
       - name: Publish version release
-        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+        shell: bash
+        run: |
+          prerelease_args=()
+          if [[ "$RELEASE_TAG" == "DEV_RELEASE" || "$RELEASE_TAG" == *-* ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            "${prerelease_args[@]}"
