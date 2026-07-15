@@ -15,7 +15,54 @@
     "loading": "Installierte Steam-Spiele werden gelesen…",
     "empty": "Es wurden keine installierten Steam-Spiele gefunden.",
     "error": "Steam-Spiele konnten nicht geladen werden.",
-    "listLabel": "Installierte Steam-Spiele"
+    "listLabel": "Installierte Steam-Spiele",
+    "bepInEx": {
+      "install": "Installieren",
+      "checking": "Wird geprüft…",
+      "installing": "Wird installiert…",
+      "downloadingPercent": "Download {percentage}%",
+      "installed": "Installiert",
+      "installedVersion": "Installiert · {version}",
+      "runtime": {
+        "mono": "Unity Mono",
+        "il2Cpp": "Unity IL2CPP"
+      },
+      "progress": {
+        "downloading": "Wird heruntergeladen…",
+        "verifying": "Wird geprüft…",
+        "installing": "Wird installiert…",
+        "completed": "Installiert"
+      },
+      "reasons": {
+        "windowsOnly": "Die automatische Installation ist derzeit nur unter Windows verfügbar.",
+        "notUnity": "Keine unterstützte Unity-Installation erkannt.",
+        "ambiguousExecutable": "Es wurden mehrere mögliche Unity-Executables gefunden.",
+        "ambiguousRuntime": "Die Unity-Runtime konnte nicht sicher bestimmt werden.",
+        "unsupportedArchitecture": "Die Spiel-EXE ist keine unterstützte Windows-x86- oder x64-Datei.",
+        "inspectionFailed": "Die Spielinstallation konnte nicht sicher geprüft werden.",
+        "unsafeSymlink": "Der Spielordner enthält einen symbolischen Link und wurde nicht verändert.",
+        "antiCheatDetected": "Anti-Cheat-Dateien erkannt. Die automatische Installation ist vorsorglich gesperrt.",
+        "existingFiles": "Vorhandene oder unvollständige BepInEx-Dateien werden nicht überschrieben."
+      },
+      "errors": {
+        "generic": "BepInEx konnte nicht installiert werden.",
+        "bepinex_already_installed": "BepInEx ist bereits installiert.",
+        "bepinex_blocked": "Die Installation ist wegen geänderter oder kollidierender Spieldateien gesperrt.",
+        "bepinex_busy": "BepInEx wird für dieses Spiel bereits installiert.",
+        "bepinex_game_running": "Schließe das Spiel, bevor du BepInEx installierst.",
+        "bepinex_install_error": "BepInEx konnte nicht in den Spielordner geschrieben werden.",
+        "bepinex_integrity_error": "Das heruntergeladene BepInEx-Paket hat die Sicherheitsprüfung nicht bestanden.",
+        "bepinex_network_error": "Die offizielle BepInEx-Downloadquelle ist nicht erreichbar.",
+        "bepinex_plan_expired": "Die Bestätigung ist abgelaufen. Starte die Installation erneut.",
+        "bepinex_unsupported": "Dieses Spiel wird für die automatische BepInEx-Installation nicht unterstützt."
+      },
+      "confirmEyebrow": "BepInEx-Installation",
+      "confirmTitle": "Installation bestätigen",
+      "confirmDescription": "BepInEx {version} für {game} installieren ({runtime}, {architecture})?",
+      "closeGameWarning": "Lass das Spiel geschlossen, bis die Installation abgeschlossen ist.",
+      "cancel": "Abbrechen",
+      "confirmInstall": "BepInEx installieren"
+    }
   },
   "settings": {
     "eyebrow": "Präferenzen",

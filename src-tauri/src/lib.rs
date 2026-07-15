@@ -1,3 +1,4 @@
+pub mod bepinex;
 pub mod commands;
 pub mod config;
 pub mod core;
@@ -10,6 +11,7 @@ use crate::commands::app::{
     get_theme_preference, get_update_channel, set_language_preference, set_theme_preference,
     set_update_channel,
 };
+use crate::commands::bepinex::{install_bepinex, prepare_bepinex_install};
 use crate::commands::steam::list_steam_games;
 use crate::config::store::load_config;
 use crate::core::state::AppState;
@@ -54,7 +56,9 @@ pub fn run() {
             download_and_install_update,
             get_app_overview,
             get_language_preference,
+            install_bepinex,
             list_steam_games,
+            prepare_bepinex_install,
             get_theme_preference,
             get_update_channel,
             set_language_preference,

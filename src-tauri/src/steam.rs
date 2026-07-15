@@ -6,6 +6,8 @@ use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
 
+use crate::bepinex::{analyze_installation, BepInExGameStatus};
+
 const LIBRARY_FOLDERS_MAX_BYTES: usize = 16 * 1024 * 1024;
 const APP_MANIFEST_MAX_BYTES: usize = 2 * 1024 * 1024;
 const VDF_MAX_DEPTH: usize = 64;
@@ -16,6 +18,9 @@ const STEAM_APPS_DIRECTORY_NAMES: [&str; 2] = ["steamapps", "SteamApps"];
 pub struct SteamGame {
     pub app_id: u32,
     pub name: String,
+    pub bep_in_ex: BepInExGameStatus,
+    #[serde(skip)]
+    pub install_directory: PathBuf,
 }
 
 #[derive(Debug)]
@@ -254,9 +259,13 @@ fn parse_manifest(path: &Path, file_app_id: u32) -> ManifestRead {
         Err(_) => return ManifestRead::IoError,
     }
 
+    let install_directory = steamapps.join("common").join(install_directory);
+
     ManifestRead::Game(SteamGame {
         app_id,
         name: name.to_owned(),
+        bep_in_ex: analyze_installation(&install_directory),
+        install_directory,
     })
 }
 
@@ -757,19 +766,9 @@ mod tests {
 
         let games = discover_from_roots(vec![primary], false).unwrap();
 
-        assert_eq!(
-            games,
-            vec![
-                SteamGame {
-                    app_id: 10,
-                    name: "alpha".into(),
-                },
-                SteamGame {
-                    app_id: 20,
-                    name: "Zulu".into(),
-                },
-            ]
-        );
+        assert_eq!(games.len(), 2);
+        assert_eq!((games[0].app_id, games[0].name.as_str()), (10, "alpha"));
+        assert_eq!((games[1].app_id, games[1].name.as_str()), (20, "Zulu"));
     }
 
     #[test]

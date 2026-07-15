@@ -13,6 +13,8 @@ pub enum AppError {
     Network(String),
     #[error("steam discovery error: {0}")]
     SteamDiscovery(String),
+    #[error("BepInEx error: {message}")]
+    BepInEx { code: &'static str, message: String },
     #[error("updater error: {0}")]
     Updater(String),
 }
@@ -25,12 +27,13 @@ pub struct ErrorResponse {
 
 impl From<AppError> for ErrorResponse {
     fn from(error: AppError) -> Self {
-        let code = match error {
+        let code = match &error {
             AppError::Config(_) => "config_error",
             AppError::Process(_) => "process_error",
             AppError::Monitoring(_) => "monitoring_error",
             AppError::Network(_) => "network_error",
             AppError::SteamDiscovery(_) => "steam_discovery_error",
+            AppError::BepInEx { code, .. } => code,
             AppError::Updater(_) => "updater_error",
         };
 
