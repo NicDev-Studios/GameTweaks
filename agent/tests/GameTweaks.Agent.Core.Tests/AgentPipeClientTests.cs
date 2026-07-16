@@ -25,7 +25,7 @@ public sealed class AgentPipeClientTests
         Assert.Equal(raw.Length - 4, BitConverter.ToInt32(raw, 0));
     }
 
-    [Fact]
+    [Fact(Timeout = 15_000)]
     public async Task DisposeStopsAConnectedWorkerAndSnapshotWriter()
     {
         var pipeName = $"GT.{Guid.NewGuid():N}";
@@ -76,8 +76,8 @@ public sealed class AgentPipeClientTests
         }
     }
 
-    [Fact]
-    public void BootstrapCanRestartAfterItsLifetimeIsDisposed()
+    [Fact(Timeout = 15_000)]
+    public async Task BootstrapCanRestartAfterItsLifetimeIsDisposed()
     {
         var markerPath = Path.Combine(
             Path.GetTempPath(),
@@ -96,7 +96,7 @@ public sealed class AgentPipeClientTests
             first = AgentBootstrap.Start(markerPath, "mono");
             Assert.True(GameTweaksApi.TryGetAgent(out var firstRegistry));
 
-            first.Dispose();
+            await Task.Run(first.Dispose);
             first.Dispose();
 
             Assert.False(GameTweaksApi.TryGetAgent(out _));
@@ -105,7 +105,7 @@ public sealed class AgentPipeClientTests
             Assert.True(GameTweaksApi.TryGetAgent(out var secondRegistry));
             Assert.NotSame(firstRegistry, secondRegistry);
 
-            second.Dispose();
+            await Task.Run(second.Dispose);
             second.Dispose();
             Assert.False(GameTweaksApi.TryGetAgent(out _));
         }
@@ -141,7 +141,7 @@ public sealed class AgentPipeClientTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 15_000)]
     public async Task SetterExceptionsReturnAStableRejectionWithoutDisconnecting()
     {
         var registry = new AgentRegistry();
@@ -181,7 +181,7 @@ public sealed class AgentPipeClientTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 15_000)]
     public async Task GetterExceptionsDisconnectThePipeAndAllowReconnect()
     {
         var registry = new AgentRegistry();

@@ -187,7 +187,7 @@ public sealed class AgentPipeClient : IDisposable
             try
             {
                 using (var pipe = new NamedPipeClientStream(
-                           ".", _pipeName, PipeDirection.InOut, PipeOptions.None))
+                           ".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous))
                 {
                     if (!TrySetActivePipe(pipe))
                         return;
