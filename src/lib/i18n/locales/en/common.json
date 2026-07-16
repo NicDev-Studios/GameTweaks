@@ -19,7 +19,6 @@
     "detail": {
       "back": "All games",
       "eyebrow": "Game details",
-      "loadingTitle": "Loading game details",
       "loading": "Loading game support…",
       "actionErrorTitle": "Action unavailable",
       "unsupportedTitle": "Game not supported",

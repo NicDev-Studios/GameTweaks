@@ -452,10 +452,32 @@
     {/if}
 
     {#if supportLoading}
-      <div class="unsupported-state detail-state loading" role="status" aria-live="polite">
-        <span class="material-symbols-rounded mod-spinner" aria-hidden="true">progress_activity</span>
-        <h2>{$t('steamGames.detail.loadingTitle')}</h2>
-        <p>{$t('steamGames.detail.loading')}</p>
+      <div class="detail-skeleton" role="status" aria-live="polite">
+        <span class="sr-only">{$t('steamGames.detail.loading')}</span>
+        <div class="mods-heading skeleton-heading" aria-hidden="true">
+          <div>
+            <span class="skeleton-line skeleton-eyebrow"></span>
+            <span class="skeleton-line skeleton-section-title"></span>
+          </div>
+        </div>
+        <div class="mod-list" aria-hidden="true">
+          <div class="mod-card mod-skeleton">
+            <div class="mod-skeleton-copy">
+              <span class="skeleton-line skeleton-mod-title"></span>
+              <span class="skeleton-line skeleton-description"></span>
+              <span class="skeleton-line skeleton-description short"></span>
+            </div>
+            <span class="skeleton-line skeleton-action"></span>
+          </div>
+          <div class="mod-card mod-skeleton">
+            <div class="mod-skeleton-copy">
+              <span class="skeleton-line skeleton-mod-title short"></span>
+              <span class="skeleton-line skeleton-description"></span>
+              <span class="skeleton-line skeleton-description medium"></span>
+            </div>
+            <span class="skeleton-line skeleton-action"></span>
+          </div>
+        </div>
       </div>
     {:else if support?.status === 'unsupported'}
       <div class="unsupported-state" role="status">
@@ -619,7 +641,18 @@
   <section class="single-panel glass-panel" aria-busy={loadState === 'loading'}>
     <SectionHeader eyebrow={$t('steamGames.eyebrow')} title={$t('steamGames.title')} description={$t('steamGames.description')} />
     {#if loadState === 'loading'}
-      <p class="game-list-status" role="status">{$t('steamGames.loading')}</p>
+      <div class="game-skeleton-list" role="status" aria-live="polite">
+        <span class="sr-only">{$t('steamGames.loading')}</span>
+        {#each [0, 1, 2] as row (row)}
+          <div class="game-skeleton-row" aria-hidden="true">
+            <span class="game-skeleton-copy">
+              <span class:short={row === 1} class="skeleton-line skeleton-game-title"></span>
+              <span class:medium={row === 2} class="skeleton-line skeleton-game-meta"></span>
+            </span>
+            <span class="skeleton-line skeleton-chevron"></span>
+          </div>
+        {/each}
+      </div>
     {:else if loadState === 'error'}
       <p class="game-list-status error" role="alert">{$t('steamGames.error')}</p>
     {:else if games.length === 0}
