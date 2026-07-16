@@ -51,8 +51,10 @@ pub async fn set_theme_preference(
     theme: ThemePreference,
 ) -> AppResult<ThemePreference> {
     let mut config = state.config.write().await;
-    config.theme = theme;
-    save_config(&app, &config)?;
+    let mut updated = config.clone();
+    updated.theme = theme;
+    save_config(&app, &updated)?;
+    *config = updated;
     Ok(config.theme.clone())
 }
 
@@ -68,8 +70,10 @@ pub async fn set_language_preference(
     language: LanguagePreference,
 ) -> AppResult<LanguagePreference> {
     let mut config = state.config.write().await;
-    config.language = language;
-    save_config(&app, &config)?;
+    let mut updated = config.clone();
+    updated.language = language;
+    save_config(&app, &updated)?;
+    *config = updated;
     Ok(config.language.clone())
 }
 
@@ -90,8 +94,10 @@ pub async fn set_developer_mode(
 ) -> AppResult<DeveloperModeState> {
     let mut config = state.config.write().await;
     if !developer_mode_forced() {
-        config.developer_mode = enabled;
-        save_config(&app, &config)?;
+        let mut updated = config.clone();
+        updated.developer_mode = enabled;
+        save_config(&app, &updated)?;
+        *config = updated;
     }
     Ok(DeveloperModeState {
         enabled: developer_mode_enabled(&config),
@@ -110,9 +116,13 @@ pub async fn set_update_channel(
     state: State<'_, AppState>,
     channel: UpdateChannel,
 ) -> AppResult<UpdateChannel> {
+    let _operation = state.update_operation.lock().await;
     let mut config = state.config.write().await;
-    config.update_channel = channel;
-    save_config(&app, &config)?;
+    let mut updated = config.clone();
+    updated.update_channel = channel;
+    save_config(&app, &updated)?;
+    *config = updated;
+    *state.pending_update.lock().await = None;
     Ok(config.update_channel)
 }
 

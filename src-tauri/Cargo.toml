@@ -5,7 +5,7 @@ description = "A desktop app for game tweaks."
 authors = ["GameTweaks contributors"]
 license = "AGPL-3.0-only"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.88"
 
 [lib]
 name = "gametweaks_lib"

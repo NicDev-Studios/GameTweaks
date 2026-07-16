@@ -41,7 +41,7 @@
         kind: 'bepinexUninstall';
         plan: { planId: string; appId: number; version: string; additionalFileCount: number };
       }
-    | { kind: 'mod'; plan: ModActionPlan; modId: string; modName: string; removeConfig?: boolean };
+    | { kind: 'mod'; plan: ModActionPlan; modId: string; modName: string };
 
   let games: SteamGame[] = [];
   let loadState: LoadState = 'loading';
@@ -338,7 +338,11 @@
             : action.plan;
         support = await uninstallMod(uninstallPlan.planId);
       }
-      await reloadDetail();
+      try {
+        await reloadDetail();
+      } catch (error) {
+        pageError = errorMessage(error);
+      }
     } catch (error) {
       if (action.kind === 'mod') {
         modErrors = { ...modErrors, [action.modId]: errorMessage(error) };
@@ -390,7 +394,19 @@
       typeof error === 'object' && error !== null && 'code' in error
         ? String((error as { code: unknown }).code)
         : '';
-    return $t(`steamGames.errors.${code || 'generic'}`);
+    if (code) {
+      const generalKey = `steamGames.errors.${code}`;
+      const generalMessage = $t(generalKey);
+      if (generalMessage !== generalKey) return generalMessage;
+
+      if (code.startsWith('bepinex_')) {
+        const installKey = `steamGames.bepInEx.errors.${code}`;
+        const installMessage = $t(installKey);
+        if (installMessage !== installKey) return installMessage;
+      }
+    }
+
+    return $t('steamGames.errors.generic');
   }
 
   function actionTitle(action: PendingAction): string {
@@ -428,7 +444,12 @@
 {#if selectedGame}
   {@const selectedRuntimeLabel = runtimeLabel(selectedGame)}
   <section class="single-panel glass-panel game-detail" aria-busy={openingGameId !== undefined || actionBusy || busyModId !== undefined}>
-    <button class="detail-back" type="button" on:click={closeGame}>
+    <button
+      class="detail-back"
+      type="button"
+      disabled={openingGameId !== undefined || actionBusy || busyModId !== undefined}
+      on:click={closeGame}
+    >
       <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
       {$t('steamGames.detail.back')}
     </button>
@@ -533,7 +554,7 @@
         {:else}
           <div class="mod-list">
             {#each support.mods as mod (mod.modId)}
-            <article class:busy={busyModId === mod.modId} class="mod-card">
+            <article class="mod-card" aria-busy={busyModId === mod.modId}>
               <header>
                 <div>
                   <div class="mod-title-row">

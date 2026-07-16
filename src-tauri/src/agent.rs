@@ -381,7 +381,7 @@ pub(crate) fn agent_is_installed(target: &InstallTarget, app_id: u32) -> bool {
 }
 
 pub(crate) fn bundled_agent_meets(minimum: Option<&str>) -> bool {
-    minimum.map_or(true, |minimum| {
+    minimum.is_none_or(|minimum| {
         semver::Version::parse(AGENT_VERSION).ok() >= semver::Version::parse(minimum).ok()
     })
 }
@@ -766,7 +766,7 @@ fn random_hex(length: usize) -> AppResult<String> {
 
 #[cfg(any(windows, test))]
 fn decode_hex(value: &str) -> Option<Vec<u8>> {
-    if value.len() % 2 != 0 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if !value.len().is_multiple_of(2) || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return None;
     }
     (0..value.len())

@@ -199,7 +199,15 @@
     "downloading": "Das signierte Update wird heruntergeladen und installiert.",
     "readyToRestart": "Update installiert. Starte GameTweaks neu, um abzuschließen.",
     "failed": "Update-Prüfung fehlgeschlagen.",
+    "errors": {
+      "check": "Die Update-Prüfung ist fehlgeschlagen. Versuche es später erneut.",
+      "checkMetadata": "Die Update-Prüfung ist fehlgeschlagen, weil die Release-Metadaten nicht verfügbar sind.",
+      "download": "Das Update konnte nicht heruntergeladen oder installiert werden. Versuche es später erneut.",
+      "restart": "GameTweaks konnte nicht automatisch neu gestartet werden.",
+      "channel": "Der Update-Kanal konnte nicht gespeichert werden."
+    },
     "startupCheck": "Beim Öffnen von GameTweaks wird nach Updates gesucht.",
+    "checking": "Es wird nach Updates gesucht.",
     "errorDetails": "Updater-Fehlerdetails anzeigen",
     "downloadProgress": "Fortschritt des Update-Downloads",
     "channel": "Update-Kanal",

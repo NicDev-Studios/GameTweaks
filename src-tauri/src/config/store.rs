@@ -1,8 +1,9 @@
-use std::fs::{self, OpenOptions};
+use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Manager};
+use tempfile::NamedTempFile;
 
 use crate::config::model::AppConfig;
 use crate::core::error::{AppError, AppResult, ErrorResponse};
@@ -93,54 +94,26 @@ fn atomic_write(path: &Path, raw: &[u8]) -> AppResult<()> {
             parent.display()
         ))
     })?;
-    let temporary_path = parent.join(format!(
-        ".{}.{}.tmp",
-        path.file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("config"),
-        std::process::id()
-    ));
-    let mut options = OpenOptions::new();
-    options.create(true).truncate(true).write(true);
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-
-    let mut file = options.open(&temporary_path).map_err(|error| {
+    let mut temporary = NamedTempFile::new_in(parent).map_err(|error| {
         AppError::Config(format!(
-            "failed to create temporary config at {}: {error}",
-            temporary_path.display()
+            "failed to create a temporary config in {}: {error}",
+            parent.display()
         ))
     })?;
-    file.write_all(raw).map_err(|error| {
+    temporary.write_all(raw).map_err(|error| {
         AppError::Config(format!(
-            "failed to write temporary config at {}: {error}",
-            temporary_path.display()
+            "failed to write a temporary config in {}: {error}",
+            parent.display()
         ))
     })?;
-    file.sync_all().map_err(|error| {
+    temporary.as_file_mut().sync_all().map_err(|error| {
         AppError::Config(format!(
-            "failed to sync temporary config at {}: {error}",
-            temporary_path.display()
+            "failed to sync a temporary config in {}: {error}",
+            parent.display()
         ))
     })?;
-    drop(file);
 
-    #[cfg(windows)]
-    if path.exists() {
-        fs::remove_file(path).map_err(|error| {
-            AppError::Config(format!(
-                "failed to replace config at {}: {error}",
-                path.display()
-            ))
-        })?;
-    }
-
-    fs::rename(&temporary_path, path).map_err(|error| {
-        let _ = fs::remove_file(&temporary_path);
+    temporary.persist(path).map_err(|error| {
         AppError::Config(format!(
             "failed to commit config at {}: {error}",
             path.display()

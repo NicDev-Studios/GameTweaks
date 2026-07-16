@@ -32,6 +32,7 @@ const MOD_ARCHIVE_MAX_UNCOMPRESSED_BYTES: u64 = 256 * 1024 * 1024;
 const MOD_ARCHIVE_MAX_ENTRIES: usize = 1_000;
 const CONFIG_MAX_BYTES: u64 = 2 * 1024 * 1024;
 const PLAN_LIFETIME: Duration = Duration::from_secs(10 * 60);
+const MAX_PENDING_PLANS: usize = 128;
 const CACHE_LIFETIME: Duration = Duration::from_secs(10 * 60);
 const MOD_PROGRESS_EVENT: &str = "gametweaks-mod-install-progress";
 
@@ -356,7 +357,8 @@ impl ConfigField {
                 let value = value.as_i64().ok_or_else(|| {
                     mod_error("mod_config_invalid", "an integer setting was invalid")
                 })?;
-                if value < *min || value > *max || *step <= 0 || (value - *min) % *step != 0 {
+                let offset = i128::from(value) - i128::from(*min);
+                if value < *min || value > *max || *step <= 0 || offset % i128::from(*step) != 0 {
                     return Err(mod_error(
                         "mod_config_invalid",
                         "an integer setting was outside its allowed range",
@@ -575,6 +577,31 @@ enum PreparedAction {
     UninstallBepInEx {
         app_id: u32,
     },
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum PreparedActionKind {
+    Install,
+    UninstallMod,
+    UninstallBepInEx,
+}
+
+impl PreparedAction {
+    fn app_id(&self) -> u32 {
+        match self {
+            Self::Install { app_id, .. }
+            | Self::UninstallMod { app_id, .. }
+            | Self::UninstallBepInEx { app_id } => *app_id,
+        }
+    }
+
+    fn kind(&self) -> PreparedActionKind {
+        match self {
+            Self::Install { .. } => PreparedActionKind::Install,
+            Self::UninstallMod { .. } => PreparedActionKind::UninstallMod,
+            Self::UninstallBepInEx { .. } => PreparedActionKind::UninstallBepInEx,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -1069,15 +1096,8 @@ pub async fn prepare_install(
     let installs_agent = requires_agent && !agent::agent_is_current(&target, app_id);
 
     let plan_id = random_token("mod_install_error")?;
-    let mut mods = state.game_mods.lock().await;
-    prune_plans(&mut mods.pending);
-    if mods.busy_games.contains(&app_id) {
-        return Err(mod_error(
-            "mod_busy",
-            "another mod action is already running",
-        ));
-    }
-    mods.pending.insert(
+    store_plan(
+        state,
         plan_id.clone(),
         PreparedPlan {
             action: PreparedAction::Install {
@@ -1088,7 +1108,8 @@ pub async fn prepare_install(
             },
             expires_at: Instant::now() + PLAN_LIFETIME,
         },
-    );
+    )
+    .await?;
     Ok(ModActionPlan {
         plan_id,
         app_id,
@@ -1108,14 +1129,13 @@ pub async fn execute_install(
         mod_ids,
         required_mod_ids,
         replace_existing,
-    } = consume_plan(state, &plan_id).await?
+    } = consume_plan(state, &plan_id, PreparedActionKind::Install).await?
     else {
         return Err(mod_error(
             "mod_plan_expired",
             "the mod installation plan was invalid",
         ));
     };
-    mark_busy(state, app_id).await?;
     let replace_existing = replace_existing.into_iter().collect();
     let result = execute_install_inner(
         app,
@@ -1126,9 +1146,12 @@ pub async fn execute_install(
         &replace_existing,
     )
     .await;
+    let result = match result {
+        Ok(()) => get_support(app, state, app_id).await,
+        Err(error) => Err(error),
+    };
     state.game_mods.lock().await.busy_games.remove(&app_id);
-    result?;
-    get_support(app, state, app_id).await
+    result
 }
 
 async fn execute_install_inner(
@@ -1319,7 +1342,8 @@ pub async fn prepare_mod_uninstall(
         }
     }
     let plan_id = random_token("mod_uninstall_error")?;
-    state.game_mods.lock().await.pending.insert(
+    store_plan(
+        state,
         plan_id.clone(),
         PreparedPlan {
             action: PreparedAction::UninstallMod {
@@ -1329,7 +1353,8 @@ pub async fn prepare_mod_uninstall(
             },
             expires_at: Instant::now() + PLAN_LIFETIME,
         },
-    );
+    )
+    .await?;
     Ok(ModActionPlan {
         plan_id,
         app_id,
@@ -1348,14 +1373,13 @@ pub async fn uninstall_mod(
         app_id,
         mod_id,
         remove_config,
-    } = consume_plan(state, &plan_id).await?
+    } = consume_plan(state, &plan_id, PreparedActionKind::UninstallMod).await?
     else {
         return Err(mod_error(
             "mod_plan_expired",
             "the mod uninstall plan was invalid",
         ));
     };
-    mark_busy(state, app_id).await?;
     let result = async {
         let game = resolve_game(app_id).await?;
         let (_, target) = analyze_windows_installation(&game.install_directory)
@@ -1416,13 +1440,18 @@ pub async fn uninstall_mod(
             }
         }
         stage_files_for_removal(&moves, "mod_uninstall_error")?;
-        prune_empty_directories(&directory, &directory);
+        if let Some(mods_root) = directory.parent() {
+            prune_empty_directories(&directory, mods_root);
+        }
         Ok::<(), ErrorResponse>(())
     }
     .await;
+    let result = match result {
+        Ok(()) => get_support(app, state, app_id).await,
+        Err(error) => Err(error),
+    };
     state.game_mods.lock().await.busy_games.remove(&app_id);
-    result?;
-    get_support(app, state, app_id).await
+    result
 }
 
 pub async fn set_config(
@@ -1438,6 +1467,19 @@ pub async fn set_config(
             "no valid settings were provided",
         ));
     }
+    mark_busy(state, app_id).await?;
+    let result = set_config_inner(app, state, app_id, mod_id, changes).await;
+    state.game_mods.lock().await.busy_games.remove(&app_id);
+    result
+}
+
+async fn set_config_inner(
+    app: &AppHandle,
+    state: &AppState,
+    app_id: u32,
+    mod_id: String,
+    changes: HashMap<String, Value>,
+) -> AppResult<GameSupport> {
     let game = resolve_game(app_id).await?;
     let (status, target) = analyze_windows_installation(&game.install_directory)
         .map_err(|_| mod_error("mod_blocked", "the game installation is not compatible"))?;
@@ -1569,13 +1611,15 @@ pub async fn prepare_bepinex_uninstall(
         .ok_or_else(|| mod_error("bepinex_not_managed", "the BepInEx marker was invalid"))?;
     let additional_file_count = collect_additional_files(&target, &marker.files)?.len();
     let plan_id = random_token("bepinex_uninstall_error")?;
-    state.game_mods.lock().await.pending.insert(
+    store_plan(
+        state,
         plan_id.clone(),
         PreparedPlan {
             action: PreparedAction::UninstallBepInEx { app_id },
             expires_at: Instant::now() + PLAN_LIFETIME,
         },
-    );
+    )
+    .await?;
     Ok(BepInExUninstallPlan {
         plan_id,
         app_id,
@@ -1589,13 +1633,14 @@ pub async fn uninstall_bepinex(
     state: &AppState,
     plan_id: String,
 ) -> AppResult<()> {
-    let PreparedAction::UninstallBepInEx { app_id } = consume_plan(state, &plan_id).await? else {
+    let PreparedAction::UninstallBepInEx { app_id } =
+        consume_plan(state, &plan_id, PreparedActionKind::UninstallBepInEx).await?
+    else {
         return Err(mod_error(
             "bepinex_uninstall_plan_expired",
             "the BepInEx uninstall plan was invalid",
         ));
     };
-    mark_busy(state, app_id).await?;
     let result = uninstall_bepinex_inner(app, app_id).await;
     state.game_mods.lock().await.busy_games.remove(&app_id);
     result
@@ -2311,7 +2356,6 @@ fn update_config_file(path: &Path, changes: &[(&ConfigField, String)]) -> AppRes
                     if key.trim().eq_ignore_ascii_case(wanted_key) {
                         *line = format!("{wanted_key} = {value}");
                         replaced = true;
-                        break;
                     }
                 }
             }
@@ -2540,13 +2584,58 @@ fn read_catalog_cache(
     Some((catalog, definitions))
 }
 
-async fn consume_plan(state: &AppState, plan_id: &str) -> AppResult<PreparedAction> {
+async fn store_plan(state: &AppState, plan_id: String, plan: PreparedPlan) -> AppResult<()> {
     let mut mods = state.game_mods.lock().await;
+    prune_plans(&mut mods.pending);
+    let app_id = plan.action.app_id();
+    let kind = plan.action.kind();
+    if mods.busy_games.contains(&app_id) {
+        return Err(mod_error(
+            "mod_busy",
+            "another mod action is already running",
+        ));
+    }
+    mods.pending
+        .retain(|_, pending| pending.action.app_id() != app_id || pending.action.kind() != kind);
+    if mods.pending.len() >= MAX_PENDING_PLANS {
+        return Err(mod_error(
+            "mod_busy",
+            "too many action confirmations are pending",
+        ));
+    }
+    mods.pending.insert(plan_id, plan);
+    Ok(())
+}
+
+async fn consume_plan(
+    state: &AppState,
+    plan_id: &str,
+    expected_kind: PreparedActionKind,
+) -> AppResult<PreparedAction> {
+    let mut mods = state.game_mods.lock().await;
+    prune_plans(&mut mods.pending);
+    let (app_id, kind) = mods
+        .pending
+        .get(plan_id)
+        .map(|plan| (plan.action.app_id(), plan.action.kind()))
+        .ok_or_else(|| mod_error("mod_plan_expired", "the action plan was missing or expired"))?;
+    if kind != expected_kind {
+        return Err(mod_error(
+            "mod_plan_expired",
+            "the action plan did not match this operation",
+        ));
+    }
+    if mods.busy_games.contains(&app_id) {
+        return Err(mod_error(
+            "mod_busy",
+            "another mod action is already running",
+        ));
+    }
     let plan = mods
         .pending
         .remove(plan_id)
-        .filter(|plan| plan.expires_at > Instant::now())
         .ok_or_else(|| mod_error("mod_plan_expired", "the action plan was missing or expired"))?;
+    mods.busy_games.insert(app_id);
     Ok(plan.action)
 }
 
@@ -2826,7 +2915,7 @@ fn valid_lower_sha256(value: &str) -> bool {
 
 fn valid_localized_text(value: &LocalizedText) -> bool {
     let valid = |text: &str| !text.trim().is_empty() && text.len() <= 512 && !text.contains('\0');
-    valid(&value.en) && value.de.as_deref().map_or(true, valid)
+    valid(&value.en) && value.de.as_deref().is_none_or(valid)
 }
 
 fn valid_config_name(value: &str) -> bool {
@@ -3000,8 +3089,16 @@ mod tests {
             },
         );
 
-        assert!(consume_plan(&state, "single-use").await.is_ok());
-        assert!(consume_plan(&state, "single-use").await.is_err());
+        assert!(
+            consume_plan(&state, "single-use", PreparedActionKind::UninstallBepInEx)
+                .await
+                .is_ok()
+        );
+        assert!(
+            consume_plan(&state, "single-use", PreparedActionKind::UninstallBepInEx)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -3015,7 +3112,40 @@ mod tests {
             },
         );
 
-        assert!(consume_plan(&state, "expired").await.is_err());
+        assert!(
+            consume_plan(&state, "expired", PreparedActionKind::UninstallBepInEx)
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn busy_actions_do_not_consume_a_confirmed_plan() {
+        let state = AppState::default();
+        let mut mods = state.game_mods.lock().await;
+        mods.pending.insert(
+            "retry-after-busy".to_owned(),
+            PreparedPlan {
+                action: PreparedAction::UninstallBepInEx { app_id: 10 },
+                expires_at: Instant::now() + Duration::from_secs(60),
+            },
+        );
+        mods.busy_games.insert(10);
+        drop(mods);
+
+        assert!(consume_plan(
+            &state,
+            "retry-after-busy",
+            PreparedActionKind::UninstallBepInEx
+        )
+        .await
+        .is_err());
+        assert!(state
+            .game_mods
+            .lock()
+            .await
+            .pending
+            .contains_key("retry-after-busy"));
     }
 
     #[test]
@@ -3100,6 +3230,29 @@ mod tests {
     }
 
     #[test]
+    fn validates_integer_steps_across_the_full_i64_range() {
+        let field = ConfigField::Integer {
+            id: "count".to_owned(),
+            section: "General".to_owned(),
+            key: "Count".to_owned(),
+            label: text("Count"),
+            description: None,
+            locked: false,
+            default: i64::MIN,
+            min: i64::MIN,
+            max: i64::MAX,
+            step: 2,
+            apply_mode: ConfigApplyMode::NextLaunch,
+        };
+
+        assert_eq!(
+            field.serialize_value(&Value::from(i64::MAX - 1)).unwrap(),
+            (i64::MAX - 1).to_string()
+        );
+        assert!(field.serialize_value(&Value::from(i64::MAX)).is_err());
+    }
+
+    #[test]
     fn config_writer_preserves_unknown_content() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("plugin.cfg");
@@ -3165,6 +3318,71 @@ mod tests {
         assert!(updated.contains("First = true"));
         assert!(updated.contains("Second = false"));
         assert!(updated.find("Second = false").unwrap() < updated.find("[Other]").unwrap());
+    }
+
+    #[test]
+    fn config_writer_updates_all_duplicate_effective_keys() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("plugin.cfg");
+        fs::write(
+            &path,
+            "[General]\nEnabled = false\nEnabled=false\n[Other]\nEnabled = keep\n[general]\nenabled = false\n",
+        )
+        .unwrap();
+        let field = ConfigField::Boolean {
+            id: "enabled".to_owned(),
+            section: "General".to_owned(),
+            key: "Enabled".to_owned(),
+            label: text("Enabled"),
+            description: None,
+            locked: false,
+            default: false,
+            apply_mode: ConfigApplyMode::Live,
+            display: BooleanDisplay::Switch,
+        };
+
+        update_config_file(&path, &[(&field, "true".to_owned())]).unwrap();
+
+        let updated = fs::read_to_string(path).unwrap();
+        assert_eq!(updated.matches("Enabled = true").count(), 3);
+        assert!(updated.contains("[Other]\nEnabled = keep"));
+    }
+
+    #[test]
+    fn mod_uninstall_prunes_the_empty_root_and_allows_reinstall() {
+        let directory = tempfile::tempdir().unwrap();
+        let target = target(directory.path());
+        let definition = definition("example.mod");
+        install_test_mod(&target, &definition, "1.0.0");
+        let mod_directory = mod_directory(&target, &definition.mod_id);
+        let marker = read_mod_marker(&mod_directory).unwrap();
+        let staging = tempfile::tempdir_in(directory.path()).unwrap();
+        let mut moves = marker
+            .files
+            .iter()
+            .map(|relative| {
+                (
+                    safe_join(&mod_directory, relative).unwrap(),
+                    safe_join(staging.path(), relative).unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        moves.push((
+            mod_directory.join(".gametweaks-mod.json"),
+            staging.path().join(".gametweaks-mod.json"),
+        ));
+
+        stage_files_for_removal(&moves, "test_error").unwrap();
+        prune_empty_directories(&mod_directory, mod_directory.parent().unwrap());
+
+        assert!(!mod_directory.exists());
+        let definitions = HashMap::from([(definition.mod_id.clone(), definition.clone())]);
+        let requested = vec![definition.mod_id.clone()];
+        let resolved = resolve_install_set(&definitions, &requested).unwrap();
+        let (actions, replacements) =
+            resolve_action_set(10, &target, &definitions, &requested, &resolved, false).unwrap();
+        assert_eq!(actions, requested);
+        assert!(replacements.is_empty());
     }
 
     #[test]

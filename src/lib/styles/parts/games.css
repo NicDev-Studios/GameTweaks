@@ -67,8 +67,7 @@
 }
 
 .game-runtime,
-.game-compatibility,
-.game-install-error {
+.game-compatibility {
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 500;
@@ -78,25 +77,11 @@
   color: var(--warning);
 }
 
-.game-install-error {
-  color: var(--danger);
-}
-
-.game-install-action {
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-}
-
 .game-row-end {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
   flex: 0 0 auto;
-}
-
-.game-install-button {
-  min-width: 8.75rem;
 }
 
 .game-installed-status {
@@ -641,11 +626,6 @@
   .game-row {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .game-install-action,
-  .game-install-button {
-    width: 100%;
   }
 
   .detail-heading,

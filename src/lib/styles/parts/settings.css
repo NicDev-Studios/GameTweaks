@@ -256,6 +256,11 @@
   transition: width 160ms ease;
 }
 
+.update-progress.indeterminate span {
+  width: 100%;
+  opacity: 0.55;
+}
+
 .update-channel-control {
   flex: 0 0 auto;
   border-radius: 0.5rem;

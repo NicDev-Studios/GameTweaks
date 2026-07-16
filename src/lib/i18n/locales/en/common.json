@@ -199,7 +199,15 @@
     "downloading": "Downloading and installing the signed update.",
     "readyToRestart": "Update installed. Restart GameTweaks to finish.",
     "failed": "Update check failed.",
+    "errors": {
+      "check": "Update check failed. Try again later.",
+      "checkMetadata": "Update check failed because the release metadata is unavailable.",
+      "download": "The update could not be downloaded or installed. Try again later.",
+      "restart": "GameTweaks could not restart automatically.",
+      "channel": "The update channel could not be saved."
+    },
     "startupCheck": "Checking for updates when GameTweaks opens.",
+    "checking": "Checking for updates.",
     "errorDetails": "Show updater error details",
     "downloadProgress": "Update download progress",
     "channel": "Update channel",

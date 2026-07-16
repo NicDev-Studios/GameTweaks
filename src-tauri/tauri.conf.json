@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "pnpm dev:frontend",
     "beforeBuildCommand": "pnpm build",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://127.0.0.1:1420",
     "frontendDist": "../build"
   },
   "app": {
@@ -22,7 +22,20 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost",
+        "font-src": "'self'",
+        "img-src": "'self' data:",
+        "style-src": "'self' 'unsafe-inline'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost ws://127.0.0.1:1420",
+        "font-src": "'self'",
+        "img-src": "'self' data:",
+        "style-src": "'self' 'unsafe-inline'"
+      }
     }
   },
   "bundle": {

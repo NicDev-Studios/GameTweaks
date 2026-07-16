@@ -1,6 +1,5 @@
 @media (max-width: 900px) {
-  .app-shell,
-  .panel-grid {
+  .app-shell {
     grid-template-columns: 1fr;
   }
 
@@ -84,6 +83,11 @@
   }
 
   .mod-spinner,
+  .button-spinner,
+  .secondary-action.check-failed,
+  .update-card:has(.update-control.error) .update-icon,
+  .update-control.error,
+  .update-error-trigger,
   .detail-state.error,
   .unsupported-state.error > .material-symbols-rounded {
     animation-duration: 1ms !important;

@@ -10,24 +10,68 @@ namespace GameTweaks.Agent.Core;
 public static class AgentBootstrap
 {
     private static readonly object Gate = new();
-    private static AgentPipeClient? _client;
+    private static AgentLifetime? _client;
 
     public static IDisposable Start(string markerPath, string runtime)
     {
-        lock (Gate)
+        AgentLifetime? failedLifetime = null;
+        try
         {
-            if (_client is not null)
-                return _client;
+            lock (Gate)
+            {
+                while (_client?.IsDisposing == true)
+                    Monitor.Wait(Gate);
+                if (_client is not null)
+                    return _client;
 
-            var marker = AgentInstallMarker.Read(markerPath);
-            if (!string.Equals(marker.Runtime, runtime, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("The GameTweaks Agent marker runtime is incompatible.");
+                var marker = AgentInstallMarker.Read(markerPath);
+                if (!string.Equals(marker.Runtime, runtime, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("The GameTweaks Agent marker runtime is incompatible.");
 
-            var registry = new AgentRegistry();
-            GameTweaksApi.Attach(registry);
-            _client = new AgentPipeClient(marker.AppId, marker.Secret, runtime, registry);
-            _client.Start();
-            return _client;
+                var registry = new AgentRegistry();
+                var lifetime = new AgentLifetime(
+                    new AgentPipeClient(marker.AppId, marker.Secret, runtime, registry),
+                    registry);
+                try
+                {
+                    lifetime.Client.Start();
+                    _client = lifetime;
+                    GameTweaksApi.Attach(registry);
+                    return lifetime;
+                }
+                catch
+                {
+                    if (lifetime.TryBeginDispose())
+                        failedLifetime = lifetime;
+                    throw;
+                }
+            }
+        }
+        catch
+        {
+            if (failedLifetime is not null)
+                DisposeCore(failedLifetime);
+            throw;
+        }
+    }
+
+    private static void Dispose(AgentLifetime lifetime) => DisposeCore(lifetime);
+
+    private static void DisposeCore(AgentLifetime lifetime)
+    {
+        try
+        {
+            lifetime.Client.Dispose();
+        }
+        finally
+        {
+            lock (Gate)
+            {
+                if (ReferenceEquals(_client, lifetime))
+                    _client = null;
+                GameTweaksApi.Detach(lifetime.Registry);
+                Monitor.PulseAll(Gate);
+            }
         }
     }
 
@@ -44,6 +88,29 @@ public static class AgentBootstrap
             Path.DirectorySeparatorChar,
             ".gametweaks-agent.json");
     }
+
+    private sealed class AgentLifetime : IDisposable
+    {
+        private int _disposed;
+
+        internal AgentLifetime(AgentPipeClient client, AgentRegistry registry)
+        {
+            Client = client;
+            Registry = registry;
+        }
+
+        internal AgentPipeClient Client { get; }
+        internal AgentRegistry Registry { get; }
+        internal bool IsDisposing => Volatile.Read(ref _disposed) != 0;
+
+        internal bool TryBeginDispose() => Interlocked.Exchange(ref _disposed, 1) == 0;
+
+        public void Dispose()
+        {
+            if (TryBeginDispose())
+                AgentBootstrap.Dispose(this);
+        }
+    }
 }
 
 public sealed class AgentPipeClient : IDisposable
@@ -51,22 +118,40 @@ public sealed class AgentPipeClient : IDisposable
     private const int ProtocolVersion = 1;
     private const int MaximumFrameBytes = 1024 * 1024;
     private const string AgentVersion = "0.1.0";
+    private const string DefaultPipeName = "GameTweaks.Agent.v1";
     private readonly uint _appId;
     private readonly byte[] _secret;
     private readonly string _runtime;
     private readonly AgentRegistry _registry;
+    private readonly string _pipeName;
     private readonly string _instanceId = Guid.NewGuid().ToString("N");
     private readonly ManualResetEvent _shutdown = new(false);
     private readonly AutoResetEvent _snapshotChanged = new(true);
+    private readonly object _stateGate = new();
     private readonly object _writeGate = new();
+    private NamedPipeClientStream? _activePipe;
     private Thread? _worker;
+    private int _disposed;
 
     public AgentPipeClient(uint appId, string secretHex, string runtime, AgentRegistry registry)
+        : this(appId, secretHex, runtime, registry, DefaultPipeName)
+    {
+    }
+
+    internal AgentPipeClient(
+        uint appId,
+        string secretHex,
+        string runtime,
+        AgentRegistry registry,
+        string pipeName)
     {
         _appId = appId;
         _secret = DecodeHex(secretHex);
         _runtime = runtime;
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+        _pipeName = string.IsNullOrWhiteSpace(pipeName)
+            ? throw new ArgumentException("The Agent pipe name is missing.", nameof(pipeName))
+            : pipeName;
         if (_secret.Length != 32)
             throw new ArgumentException("The Agent secret must be 256-bit.", nameof(secretHex));
         _registry.Changed += HandleRegistryChanged;
@@ -74,10 +159,24 @@ public sealed class AgentPipeClient : IDisposable
 
     public void Start()
     {
-        if (_worker is not null)
-            return;
-        _worker = new Thread(Run) { IsBackground = true, Name = "GameTweaks Agent" };
-        _worker.Start();
+        lock (_stateGate)
+        {
+            if (_disposed != 0)
+                throw new ObjectDisposedException(nameof(AgentPipeClient));
+            if (_worker is not null)
+                return;
+            var worker = new Thread(Run) { IsBackground = true, Name = "GameTweaks Agent" };
+            _worker = worker;
+            try
+            {
+                worker.Start();
+            }
+            catch
+            {
+                _worker = null;
+                throw;
+            }
+        }
     }
 
     private void Run()
@@ -88,12 +187,23 @@ public sealed class AgentPipeClient : IDisposable
             try
             {
                 using (var pipe = new NamedPipeClientStream(
-                           ".", "GameTweaks.Agent.v1", PipeDirection.InOut, PipeOptions.None))
+                           ".", _pipeName, PipeDirection.InOut, PipeOptions.None))
                 {
-                    pipe.Connect(5000);
-                    Authenticate(pipe);
-                    delayMilliseconds = 1000;
-                    RunConnected(pipe);
+                    if (!TrySetActivePipe(pipe))
+                        return;
+                    try
+                    {
+                        pipe.Connect(5000);
+                        if (_shutdown.WaitOne(0))
+                            return;
+                        Authenticate(pipe);
+                        delayMilliseconds = 1000;
+                        RunConnected(pipe);
+                    }
+                    finally
+                    {
+                        ClearActivePipe(pipe);
+                    }
                 }
             }
             catch (TimeoutException error)
@@ -117,6 +227,11 @@ public sealed class AgentPipeClient : IDisposable
                     return;
             }
             catch (KeyNotFoundException error)
+            {
+                if (!WaitBeforeReconnect(error, ref delayMilliseconds))
+                    return;
+            }
+            catch (ObjectDisposedException error)
             {
                 if (!WaitBeforeReconnect(error, ref delayMilliseconds))
                     return;
@@ -189,14 +304,17 @@ public sealed class AgentPipeClient : IDisposable
     private void RunConnected(Stream pipe)
     {
         _snapshotChanged.Set();
-        var writer = new Thread(() => WriteSnapshots(pipe))
+        using var connectionClosed = new ManualResetEvent(false);
+        var writer = new Thread(() => WriteSnapshots(pipe, connectionClosed))
         {
             IsBackground = true,
             Name = "GameTweaks Agent snapshots"
         };
-        writer.Start();
+        var writerStarted = false;
         try
         {
+            writer.Start();
+            writerStarted = true;
             while (!_shutdown.WaitOne(0))
             {
                 using var message = ReadJson(pipe);
@@ -205,16 +323,27 @@ public sealed class AgentPipeClient : IDisposable
         }
         finally
         {
+            connectionClosed.Set();
             _snapshotChanged.Set();
+            try
+            {
+                pipe.Dispose();
+            }
+            finally
+            {
+                if (writerStarted)
+                    writer.Join();
+            }
         }
     }
 
-    private void WriteSnapshots(Stream pipe)
+    private void WriteSnapshots(Stream pipe, WaitHandle connectionClosed)
     {
+        var waitHandles = new WaitHandle[] { _shutdown, connectionClosed, _snapshotChanged };
         while (!_shutdown.WaitOne(0))
         {
-            var signaled = WaitHandle.WaitAny(new WaitHandle[] { _shutdown, _snapshotChanged });
-            if (signaled == 0)
+            var signaled = WaitHandle.WaitAny(waitHandles);
+            if (signaled is 0 or 1)
                 return;
             try
             {
@@ -228,31 +357,53 @@ public sealed class AgentPipeClient : IDisposable
                     mods
                 });
             }
+            catch (AgentCallbackException error)
+            {
+                StopSnapshotWriter(pipe, error);
+                return;
+            }
             catch (IOException error)
             {
-                TraceSnapshotFailure(error);
+                StopSnapshotWriter(pipe, error);
                 return;
             }
             catch (ObjectDisposedException error)
             {
-                TraceSnapshotFailure(error);
+                StopSnapshotWriter(pipe, error);
                 return;
             }
             catch (InvalidOperationException error)
             {
-                TraceSnapshotFailure(error);
+                StopSnapshotWriter(pipe, error);
                 return;
             }
             catch (JsonException error)
             {
-                TraceSnapshotFailure(error);
+                StopSnapshotWriter(pipe, error);
                 return;
             }
             catch (NotSupportedException error)
             {
-                TraceSnapshotFailure(error);
+                StopSnapshotWriter(pipe, error);
                 return;
             }
+        }
+    }
+
+    private static void StopSnapshotWriter(Stream pipe, Exception error)
+    {
+        TraceSnapshotFailure(error);
+        try
+        {
+            pipe.Dispose();
+        }
+        catch (IOException)
+        {
+            // The connection may already be closing on the reader thread.
+        }
+        catch (ObjectDisposedException)
+        {
+            // A concurrent disconnect can dispose the pipe first.
         }
     }
 
@@ -290,11 +441,7 @@ public sealed class AgentPipeClient : IDisposable
                 break;
             }
 
-            var result = setting.Metadata.ApplyMode == SettingApplyMode.Live
-                ? setting.Binding.SetValue(converted)
-                : setting.Binding is IDeferredSettingBinding deferred
-                    ? deferred.SetStoredValue(converted, setting.Metadata.ApplyMode)
-                    : SettingChangeResult.Reject("deferred_write_unsupported");
+            var result = ApplySetting(setting, converted);
             if (!result.Accepted)
             {
                 errorCode = result.ErrorCode ?? "rejected";
@@ -327,11 +474,46 @@ public sealed class AgentPipeClient : IDisposable
                 .Select(setting => CreateField(setting.Metadata)).ToArray(),
             values = mod.Settings.Values.ToDictionary(
                 setting => setting.Metadata.Id,
-                setting => setting.Binding.GetValue(),
+                GetSettingValue,
                 StringComparer.Ordinal)
         })
         .Cast<object>()
         .ToArray();
+
+    private static SettingChangeResult ApplySetting(RegisteredSetting setting, object? value)
+    {
+        try
+        {
+            return setting.Metadata.ApplyMode == SettingApplyMode.Live
+                ? setting.Binding.SetValue(value) ?? SettingChangeResult.Reject("binding_error")
+                : setting.Binding is IDeferredSettingBinding deferred
+                    ? deferred.SetStoredValue(value, setting.Metadata.ApplyMode) ??
+                      SettingChangeResult.Reject("binding_error")
+                    : SettingChangeResult.Reject("deferred_write_unsupported");
+        }
+        catch (Exception error)
+        {
+            Trace.TraceWarning(
+                "GameTweaks Agent setting callback failed ({0}): {1}",
+                error.GetType().Name,
+                error.Message);
+            return SettingChangeResult.Reject("binding_error");
+        }
+    }
+
+    private static object? GetSettingValue(RegisteredSetting setting)
+    {
+        try
+        {
+            return setting.Binding.GetValue();
+        }
+        catch (Exception error)
+        {
+            throw new AgentCallbackException(
+                $"The getter for Agent setting '{setting.Metadata.Id}' failed.",
+                error);
+        }
+    }
 
     private static Dictionary<string, object?> CreateField(SettingMetadata metadata)
     {
@@ -434,7 +616,34 @@ public sealed class AgentPipeClient : IDisposable
         _ => throw new ArgumentOutOfRangeException(nameof(mode))
     };
 
-    private void HandleRegistryChanged() => _snapshotChanged.Set();
+    private bool TrySetActivePipe(NamedPipeClientStream pipe)
+    {
+        lock (_stateGate)
+        {
+            if (_disposed != 0)
+                return false;
+            _activePipe = pipe;
+            return true;
+        }
+    }
+
+    private void ClearActivePipe(NamedPipeClientStream pipe)
+    {
+        lock (_stateGate)
+        {
+            if (ReferenceEquals(_activePipe, pipe))
+                _activePipe = null;
+        }
+    }
+
+    private void HandleRegistryChanged()
+    {
+        lock (_stateGate)
+        {
+            if (_disposed == 0)
+                _snapshotChanged.Set();
+        }
+    }
 
     private void WriteJsonLocked(Stream stream, object message)
     {
@@ -497,12 +706,50 @@ public sealed class AgentPipeClient : IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            return;
+
         _registry.Changed -= HandleRegistryChanged;
-        _shutdown.Set();
-        _snapshotChanged.Set();
-        _worker?.Join(2000);
-        _snapshotChanged.Dispose();
-        _shutdown.Dispose();
+        NamedPipeClientStream? activePipe;
+        Thread? worker;
+        lock (_stateGate)
+        {
+            _shutdown.Set();
+            _snapshotChanged.Set();
+            activePipe = _activePipe;
+            worker = _worker;
+        }
+
+        try
+        {
+            activePipe?.Dispose();
+        }
+        catch (IOException)
+        {
+            // Closing the pipe is only used to unblock the worker during shutdown.
+        }
+        catch (ObjectDisposedException)
+        {
+            // A disconnect can race with shutdown and dispose the same pipe first.
+        }
+
+        if (worker is not null && !ReferenceEquals(worker, Thread.CurrentThread))
+            worker.Join();
+
+        lock (_stateGate)
+        {
+            _activePipe = null;
+            _snapshotChanged.Dispose();
+            _shutdown.Dispose();
+        }
+    }
+}
+
+internal sealed class AgentCallbackException : Exception
+{
+    internal AgentCallbackException(string message, Exception innerException)
+        : base(message, innerException)
+    {
     }
 }
 

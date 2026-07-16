@@ -29,18 +29,20 @@
         : $updaterStore.displayStatus === 'error'
           ? 'error'
           : 'verified';
-  $: updateBusy = $updaterStore.status === 'checking' || $updaterStore.status === 'downloading';
+  $: updateBusy =
+    $updaterStore.channelChanging ||
+    $updaterStore.status === 'checking' ||
+    $updaterStore.status === 'downloading';
   $: updateChecking = $updaterStore.status === 'checking';
   $: updateFailed = $updaterStore.status === 'error';
   $: showManualUpdateCheck =
     $updaterStore.status !== 'available' &&
     $updaterStore.status !== 'readyToRestart' &&
     $updaterStore.status !== 'downloading';
-  $: showUpdateError = updateFailed || (updateChecking && Boolean($updaterStore.error));
-  $: updateMessage =
-    updateChecking && $updaterStore.error
-      ? $updaterStore.error
-      : getUpdateMessage($updaterStore.displayStatus);
+  $: showUpdateError = Boolean($updaterStore.error);
+  $: updateMessage = $updaterStore.error
+    ? $t(`updates.errors.${$updaterStore.error}`)
+    : getUpdateMessage($updaterStore.status);
 
   getAppOverview()
     .then((appOverview) => {
@@ -85,6 +87,7 @@
     if (status === 'available') {
       return $t('updates.available', { version: $updaterStore.info?.version ?? '' });
     }
+    if (status === 'checking') return $t('updates.checking');
     if (status === 'upToDate') return $t('updates.upToDate');
     if (status === 'downloading') return $t('updates.downloading');
     if (status === 'readyToRestart') return $t('updates.readyToRestart');
@@ -112,7 +115,9 @@
 
     <div class:error={showUpdateError} class="update-control">
       <div class="update-message-row">
-        <p class:error={showUpdateError}>{updateMessage}</p>
+        <p class:error={showUpdateError} role={showUpdateError ? 'alert' : 'status'} aria-live="polite">
+          {updateMessage}
+        </p>
 
         {#if showUpdateError && $updaterStore.errorDetail}
           <span class="update-error-tip">
@@ -120,10 +125,13 @@
               class="update-error-trigger material-symbols-rounded"
               type="button"
               aria-label={$t('updates.errorDetails')}
+              aria-describedby="update-error-details"
             >
               priority_high
             </button>
-            <span class="update-error-tooltip" role="tooltip">{$updaterStore.errorDetail}</span>
+            <span id="update-error-details" class="update-error-tooltip" role="tooltip">
+              {$updaterStore.errorDetail}
+            </span>
           </span>
         {/if}
       </div>
@@ -134,6 +142,7 @@
 
       {#if $updaterStore.status === 'downloading'}
         <div
+          class:indeterminate={$updaterStore.progress.percentage === undefined}
           class="update-progress"
           role="progressbar"
           aria-label={$t('updates.downloadProgress')}
@@ -141,7 +150,11 @@
           aria-valuemin="0"
           aria-valuemax="100"
         >
-          <span style={`width: ${$updaterStore.progress.percentage ?? 12}%`}></span>
+          <span
+            style:width={$updaterStore.progress.percentage === undefined
+              ? undefined
+              : `${$updaterStore.progress.percentage}%`}
+          ></span>
         </div>
       {/if}
 
@@ -150,6 +163,7 @@
           <button
             type="button"
             class:active={$updaterStore.channel === 'stable'}
+            aria-pressed={$updaterStore.channel === 'stable'}
             disabled={updateBusy}
             on:click={() => handleUpdateChannelChange('stable')}
           >
@@ -158,6 +172,7 @@
           <button
             type="button"
             class:active={$updaterStore.channel === 'beta'}
+            aria-pressed={$updaterStore.channel === 'beta'}
             disabled={updateBusy}
             on:click={() => handleUpdateChannelChange('beta')}
           >
@@ -188,12 +203,22 @@
           {/if}
 
           {#if $updaterStore.status === 'available'}
-            <button class="primary-action update-primary-action" type="button" on:click={handleDownloadAndInstall}>
+            <button
+              class="primary-action update-primary-action"
+              type="button"
+              disabled={updateBusy}
+              on:click={handleDownloadAndInstall}
+            >
               <span class="material-symbols-rounded" aria-hidden="true">download</span>
               <span>{$t('updates.download')}</span>
             </button>
           {:else if $updaterStore.status === 'readyToRestart'}
-            <button class="primary-action update-primary-action" type="button" on:click={handleRestart}>
+            <button
+              class="primary-action update-primary-action"
+              type="button"
+              disabled={updateBusy}
+              on:click={handleRestart}
+            >
               <span class="material-symbols-rounded" aria-hidden="true">restart_alt</span>
               <span>{$t('updates.restart')}</span>
             </button>
@@ -229,6 +254,7 @@
         <button
           type="button"
           class:active={$themeStore === mode.id}
+          aria-pressed={$themeStore === mode.id}
           on:click={() => themeStore.set(mode.id)}
         >
           {$t(mode.labelKey)}

@@ -266,18 +266,17 @@ pub fn analyze_installation(install_directory: &Path) -> BepInExGameStatus {
 pub(crate) fn analyze_windows_installation(
     install_directory: &Path,
 ) -> Result<(BepInExGameStatus, InstallTarget), BepInExGameStatus> {
-    let install_directory = fs::canonicalize(install_directory)
+    let install_metadata = fs::symlink_metadata(install_directory)
         .map_err(|_| BepInExGameStatus::blocked(BepInExReason::InspectionFailed, None, None))?;
-    if fs::symlink_metadata(&install_directory)
-        .map(|metadata| metadata.file_type().is_symlink())
-        .unwrap_or(true)
-    {
+    if install_metadata.file_type().is_symlink() {
         return Err(BepInExGameStatus::blocked(
             BepInExReason::UnsafeSymlink,
             None,
             None,
         ));
     }
+    let install_directory = fs::canonicalize(install_directory)
+        .map_err(|_| BepInExGameStatus::blocked(BepInExReason::InspectionFailed, None, None))?;
 
     let candidates = find_unity_candidates(&install_directory)?;
     if candidates.is_empty() {
@@ -1840,6 +1839,22 @@ mod tests {
 
         let status = analyze_windows_installation(directory.path()).unwrap_err();
         assert_eq!(status.reason, Some(BepInExReason::AntiCheatDetected));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_a_symlinked_installation_root() {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir().unwrap();
+        let installation = directory.path().join("installation");
+        let link = directory.path().join("installation-link");
+        fs::create_dir(&installation).unwrap();
+        symlink(&installation, &link).unwrap();
+
+        let status = analyze_windows_installation(&link).unwrap_err();
+
+        assert_eq!(status.reason, Some(BepInExReason::UnsafeSymlink));
     }
 
     #[test]

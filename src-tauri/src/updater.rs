@@ -48,6 +48,8 @@ struct GitHubReleaseAsset {
 }
 
 pub async fn check_for_update(app: &AppHandle, state: &AppState) -> AppResult<Option<UpdateInfo>> {
+    let _operation = state.update_operation.lock().await;
+
     if !crate::version::is_release_build() {
         *state.pending_update.lock().await = None;
         return Ok(None);
@@ -82,15 +84,16 @@ pub async fn check_for_update(app: &AppHandle, state: &AppState) -> AppResult<Op
 }
 
 pub async fn download_and_install_update(app: &AppHandle, state: &AppState) -> AppResult<()> {
+    let _operation = state.update_operation.lock().await;
     let update =
-        state.pending_update.lock().await.clone().ok_or_else(|| {
+        state.pending_update.lock().await.take().ok_or_else(|| {
             ErrorResponse::from(AppError::Updater("no update is available".into()))
         })?;
 
     let mut downloaded_bytes = 0_u64;
     let app_handle = app.clone();
 
-    update
+    if let Err(error) = update
         .download_and_install(
             |chunk_len, total_bytes| {
                 downloaded_bytes = downloaded_bytes.saturating_add(chunk_len as u64);
@@ -109,9 +112,10 @@ pub async fn download_and_install_update(app: &AppHandle, state: &AppState) -> A
             || {},
         )
         .await
-        .map_err(updater_error)?;
-
-    *state.pending_update.lock().await = None;
+    {
+        *state.pending_update.lock().await = Some(update);
+        return Err(updater_error(error));
+    }
 
     Ok(())
 }

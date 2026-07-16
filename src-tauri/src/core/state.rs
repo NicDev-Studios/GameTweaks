@@ -14,6 +14,7 @@ pub struct AppState {
     pub bepinex: Arc<Mutex<BepInExInstallState>>,
     pub game_mods: Arc<Mutex<GameModsState>>,
     pub agent: Arc<Mutex<AgentState>>,
+    pub update_operation: Arc<Mutex<()>>,
     pub pending_update: Arc<Mutex<Option<Update>>>,
 }
 
@@ -24,6 +25,7 @@ impl Default for AppState {
             bepinex: Arc::new(Mutex::new(BepInExInstallState::default())),
             game_mods: Arc::new(Mutex::new(GameModsState::default())),
             agent: Arc::new(Mutex::new(AgentState::default())),
+            update_operation: Arc::new(Mutex::new(())),
             pending_update: Arc::new(Mutex::new(None)),
         }
     }

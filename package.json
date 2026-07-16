@@ -15,10 +15,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/material-symbols-rounded": "5.2.45",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-opener": "^2.5.4",
-    "@tauri-apps/plugin-process": "^2.3.1",
-    "@tauri-apps/plugin-updater": "^2.10.1"
+    "@tauri-apps/plugin-process": "^2.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

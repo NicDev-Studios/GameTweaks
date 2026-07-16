@@ -9,21 +9,47 @@ function applyTheme(mode: ThemeMode) {
 }
 
 function createThemeStore() {
-  const { subscribe, set } = writable<ThemeMode>('system');
+  const store = writable<ThemeMode>('system');
+  const { subscribe, set } = store;
+  let persistedMode: ThemeMode = 'system';
+  let revision = 0;
+  let writeQueue = Promise.resolve();
 
   return {
     subscribe,
     async init() {
+      const initRevision = revision;
       const mode = await getThemePreference().catch(() => 'system' as ThemeMode);
+      if (initRevision !== revision) return;
+
+      persistedMode = mode;
       set(mode);
       applyTheme(mode);
     },
     async set(mode: ThemeMode) {
+      const requestRevision = ++revision;
       set(mode);
       applyTheme(mode);
-      const savedMode = await setThemePreference(mode).catch(() => mode);
-      set(savedMode);
-      applyTheme(savedMode);
+
+      const write = writeQueue.then(() => setThemePreference(mode));
+      writeQueue = write.then(
+        () => undefined,
+        () => undefined
+      );
+
+      try {
+        const savedMode = await write;
+        persistedMode = savedMode;
+        if (requestRevision !== revision) return;
+
+        set(savedMode);
+        applyTheme(savedMode);
+      } catch {
+        if (requestRevision !== revision) return;
+
+        set(persistedMode);
+        applyTheme(persistedMode);
+      }
     }
   };
 }

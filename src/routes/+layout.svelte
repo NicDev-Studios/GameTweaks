@@ -8,25 +8,9 @@
   import { themeStore } from '$lib/stores/theme';
 
   onMount(() => {
-    function syncFocusState() {
-      globalThis.document.documentElement.classList.toggle(
-        'app-unfocused',
-        !globalThis.document.hasFocus()
-      );
-    }
-
     languageStore.init();
     developerModeStore.init();
     themeStore.init();
-    syncFocusState();
-
-    globalThis.addEventListener('focus', syncFocusState);
-    globalThis.addEventListener('blur', syncFocusState);
-
-    return () => {
-      globalThis.removeEventListener('focus', syncFocusState);
-      globalThis.removeEventListener('blur', syncFocusState);
-    };
   });
 </script>
 

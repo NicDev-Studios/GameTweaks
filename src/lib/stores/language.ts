@@ -1,4 +1,4 @@
-import { get, writable } from 'svelte/store';
+import { writable } from 'svelte/store';
 import { getLanguagePreference, setLanguagePreference } from '$lib/api/app';
 
 export type SupportedLanguage = 'en' | 'de';
@@ -38,24 +38,45 @@ function applyLanguage(mode: LanguageMode) {
 
 function createLanguageStore() {
   const { subscribe, set } = languageStoreInternal;
+  let persistedMode: LanguageMode = 'automatic';
+  let revision = 0;
+  let writeQueue = Promise.resolve();
 
   return {
     subscribe,
     async init() {
+      const initRevision = revision;
       const mode = await getLanguagePreference().catch(() => 'automatic' as LanguageMode);
+      if (initRevision !== revision) return;
+
+      persistedMode = mode;
       set(mode);
       applyLanguage(mode);
     },
     async set(mode: LanguageMode) {
+      const requestRevision = ++revision;
       set(mode);
       applyLanguage(mode);
-      const savedMode = await setLanguagePreference(mode).catch(() => mode);
-      set(savedMode);
-      applyLanguage(savedMode);
-    },
-    refreshSystemLanguage() {
-      const mode = get(languageStoreInternal);
-      applyLanguage(mode);
+
+      const write = writeQueue.then(() => setLanguagePreference(mode));
+      writeQueue = write.then(
+        () => undefined,
+        () => undefined
+      );
+
+      try {
+        const savedMode = await write;
+        persistedMode = savedMode;
+        if (requestRevision !== revision) return;
+
+        set(savedMode);
+        applyLanguage(savedMode);
+      } catch {
+        if (requestRevision !== revision) return;
+
+        set(persistedMode);
+        applyLanguage(persistedMode);
+      }
     }
   };
 }

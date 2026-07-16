@@ -13,20 +13,21 @@ import {
 
 export interface UpdaterState {
   channel: UpdateChannel;
-  checkedOnStartup: boolean;
+  channelChanging: boolean;
   displayStatus: UpdateStatus;
-  error: string;
+  error?: UpdaterError;
   errorDetail: string;
   info?: UpdateInfo;
   progress: DownloadProgress;
   status: UpdateStatus;
 }
 
+export type UpdaterError = 'check' | 'checkMetadata' | 'download' | 'restart' | 'channel';
+
 const initialState: UpdaterState = {
   channel: 'stable',
-  checkedOnStartup: false,
+  channelChanging: false,
   displayStatus: 'idle',
-  error: '',
   errorDetail: '',
   progress: { downloadedBytes: 0 },
   status: 'idle'
@@ -36,6 +37,7 @@ function createUpdaterStore() {
   const { subscribe, update } = writable<UpdaterState>(initialState);
   let initializePromise: Promise<void> | undefined;
   let startupCheckPromise: Promise<void> | undefined;
+  let channelChangePromise: Promise<void> | undefined;
 
   const initialize = async () => {
     if (!initializePromise) {
@@ -49,12 +51,13 @@ function createUpdaterStore() {
     return initializePromise;
   };
 
-  const checkForUpdates = async (checkedOnStartup = false) => {
+  const checkForUpdates = async () => {
     const startedAt = Date.now();
 
     update((state) => ({
       ...state,
-      checkedOnStartup: state.checkedOnStartup || checkedOnStartup,
+      error: undefined,
+      errorDetail: '',
       status: 'checking'
     }));
 
@@ -65,8 +68,7 @@ function createUpdaterStore() {
       const status = info ? 'available' : 'upToDate';
       update((state) => ({
         ...state,
-        checkedOnStartup: state.checkedOnStartup || checkedOnStartup,
-        error: '',
+        error: undefined,
         errorDetail: '',
         displayStatus: status,
         info: info ?? undefined,
@@ -78,12 +80,40 @@ function createUpdaterStore() {
       reportUpdaterError(error);
       update((state) => ({
         ...state,
-        checkedOnStartup: state.checkedOnStartup || checkedOnStartup,
         displayStatus: 'error',
-        error: getUserFacingErrorMessage(error),
+        error: getUpdaterError(error, 'check'),
         errorDetail: getErrorMessage(error),
         status: 'error'
       }));
+    }
+  };
+
+  const changeChannel = async (channel: UpdateChannel) => {
+    update((state) => ({ ...state, channelChanging: true }));
+    try {
+      const savedChannel = await setUpdateChannel(channel);
+      startupCheckPromise = undefined;
+      update((state) => ({
+        ...state,
+        channel: savedChannel,
+        displayStatus: 'idle',
+        error: undefined,
+        errorDetail: '',
+        info: undefined,
+        progress: { downloadedBytes: 0 },
+        status: 'idle'
+      }));
+    } catch (error) {
+      reportUpdaterError(error);
+      update((state) => ({
+        ...state,
+        displayStatus: 'error',
+        error: 'channel',
+        errorDetail: getErrorMessage(error),
+        status: 'error'
+      }));
+    } finally {
+      update((state) => ({ ...state, channelChanging: false }));
     }
   };
 
@@ -93,7 +123,7 @@ function createUpdaterStore() {
     initialize,
     checkForUpdatesOnStartup() {
       if (!startupCheckPromise) {
-        startupCheckPromise = initialize().then(() => checkForUpdates(true));
+        startupCheckPromise = initialize().then(checkForUpdates);
       }
 
       return startupCheckPromise;
@@ -101,7 +131,7 @@ function createUpdaterStore() {
     async downloadAndInstall() {
       update((state) => ({
         ...state,
-        error: '',
+        error: undefined,
         errorDetail: '',
         progress: { downloadedBytes: 0 },
         status: 'downloading'
@@ -121,14 +151,14 @@ function createUpdaterStore() {
         update((state) => ({
           ...state,
           displayStatus: 'error',
-          error: getUserFacingErrorMessage(error),
+          error: 'download',
           errorDetail: getErrorMessage(error),
           status: 'error'
         }));
       }
     },
     async restart() {
-      update((state) => ({ ...state, error: '', errorDetail: '' }));
+      update((state) => ({ ...state, error: undefined, errorDetail: '' }));
 
       try {
         await restartApplication();
@@ -137,25 +167,20 @@ function createUpdaterStore() {
         update((state) => ({
           ...state,
           displayStatus: 'error',
-          error: getUserFacingErrorMessage(error),
+          error: 'restart',
           errorDetail: getErrorMessage(error),
           status: 'error'
         }));
       }
     },
-    async setChannel(channel: UpdateChannel) {
-      const savedChannel = await setUpdateChannel(channel);
-      startupCheckPromise = undefined;
-      update((state) => ({
-        ...state,
-        channel: savedChannel,
-        displayStatus: 'idle',
-        error: '',
-        errorDetail: '',
-        info: undefined,
-        progress: { downloadedBytes: 0 },
-        status: 'idle'
-      }));
+    setChannel(channel: UpdateChannel) {
+      if (!channelChangePromise) {
+        channelChangePromise = changeChannel(channel).finally(() => {
+          channelChangePromise = undefined;
+        });
+      }
+
+      return channelChangePromise;
     }
   };
 }
@@ -177,14 +202,14 @@ function isErrorResponse(error: unknown): error is { message: string } {
   );
 }
 
-function getUserFacingErrorMessage(error: unknown) {
+function getUpdaterError(error: unknown, fallback: UpdaterError): UpdaterError {
   const message = getErrorMessage(error);
 
   if (message.toLowerCase().includes('release json')) {
-    return 'Update check failed because the release metadata is not available.';
+    return 'checkMetadata';
   }
 
-  return 'Update check failed. Try again later.';
+  return fallback;
 }
 
 function reportUpdaterError(error: unknown) {

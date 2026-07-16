@@ -170,4 +170,15 @@ public static class GameTweaksApi
             _agent = agent;
         Available?.Invoke(agent);
     }
+
+    internal static void Detach(IGameTweaksAgent agent)
+    {
+        if (agent is null)
+            throw new ArgumentNullException(nameof(agent));
+        lock (Gate)
+        {
+            if (ReferenceEquals(_agent, agent))
+                _agent = null;
+        }
+    }
 }
