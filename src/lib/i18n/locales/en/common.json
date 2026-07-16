@@ -37,6 +37,11 @@
       "incompatible": "Agent incompatible",
       "ambiguous": "Multiple game instances"
     },
+    "developerAgent": {
+      "install": "Install / repair dev agent",
+      "confirmTitle": "Install development agent",
+      "confirmDescription": "Install or safely repair the bundled GameTweaks agent for {game}?"
+    },
     "mods": {
       "eyebrow": "GameTweaks catalog",
       "title": "Mods",
@@ -95,6 +100,8 @@
       "mod_schema_conflict": "A live Agent setting conflicts with the reviewed catalog schema.",
       "mod_agent_required": "Close the game or connect the GameTweaks agent before changing settings.",
       "agent_unavailable": "The matching GameTweaks agent build is unavailable.",
+      "agent_unsupported": "The GameTweaks agent is currently available on Windows only.",
+      "agent_install_blocked": "The game installation is not compatible with the development agent.",
       "agent_collision": "An existing Agent installation is not safely managed by GameTweaks.",
       "agent_install_error": "The GameTweaks Agent could not be installed safely.",
       "agent_security_error": "The Agent security material could not be created.",
@@ -102,6 +109,8 @@
       "agent_disconnected": "The game Agent disconnected.",
       "agent_timeout": "The game Agent did not confirm the change in time.",
       "agent_config_rejected": "The mod rejected this configuration change.",
+      "developer_mode_required": "Enable Developer Mode in Settings first.",
+      "bepinex_blocked": "The change was blocked because the game files are unsafe or conflicting.",
       "bepinex_game_running": "Close the game before changing its files.",
       "bepinex_not_managed": "Only BepInEx installations created by GameTweaks can be removed.",
       "bepinex_uninstall_unsupported": "BepInEx uninstall is currently available on Windows only.",
@@ -164,13 +173,19 @@
   "settings": {
     "eyebrow": "Preferences",
     "title": "Settings",
-    "description": "Keep the interface aligned with your system or pin a specific appearance.",
+    "description": "Manage the interface, updates, and optional development tools.",
     "language": {
       "title": "Language",
       "description": "Interface language",
       "ariaLabel": "Language",
       "automatic": "German (Automatic)",
       "english": "English"
+    },
+    "developerMode": {
+      "title": "Developer Mode",
+      "description": "Enables local mod development tools. Only install plugins whose code you trust.",
+      "forcedDescription": "Developer Mode is always enabled in local development builds.",
+      "ariaLabel": "Enable Developer Mode"
     }
   },
   "updates": {

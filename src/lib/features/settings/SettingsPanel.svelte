@@ -4,6 +4,7 @@
   import { getAppOverview, type AppOverview } from '$lib/api/app';
   import { t } from '$lib/i18n';
   import { languageStore, type LanguageMode } from '$lib/stores/language';
+  import { developerModeStore } from '$lib/stores/developerMode';
   import { themeStore, type ThemeMode } from '$lib/stores/theme';
   import { updaterStore } from '$lib/stores/updater';
   import type { UpdateStatus } from '$lib/api/updater';
@@ -70,6 +71,10 @@
   async function handleLanguageChange(event: { currentTarget: { value: string } }) {
     const value = event.currentTarget.value as LanguageMode;
     await languageStore.set(value);
+  }
+
+  async function handleDeveloperModeChange(event: { currentTarget: { checked: boolean } }) {
+    await developerModeStore.setEnabled(event.currentTarget.checked);
   }
 
   async function handleOpenRepository() {
@@ -230,6 +235,27 @@
         </button>
       {/each}
     </div>
+  </div>
+
+  <div class="settings-row developer-mode-row">
+    <div>
+      <h2>{$t('settings.developerMode.title')}</h2>
+      <p>
+        {$developerModeStore.forced
+          ? $t('settings.developerMode.forcedDescription')
+          : $t('settings.developerMode.description')}
+      </p>
+    </div>
+    <label class:forced={$developerModeStore.forced} class="settings-toggle">
+      <input
+        type="checkbox"
+        checked={$developerModeStore.enabled}
+        disabled={$developerModeStore.forced}
+        aria-label={$t('settings.developerMode.ariaLabel')}
+        on:change={handleDeveloperModeChange}
+      />
+      <span aria-hidden="true"></span>
+    </label>
   </div>
 
   <footer class="settings-footer">

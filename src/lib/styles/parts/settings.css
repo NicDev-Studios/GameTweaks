@@ -384,6 +384,71 @@
   transform: translateY(-50%);
 }
 
+.settings-toggle {
+  position: relative;
+  display: inline-flex;
+  width: 2.75rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+}
+
+.settings-toggle input {
+  position: absolute;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.settings-toggle > span {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.settings-toggle > span::after {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  margin: 0.18rem;
+  border-radius: 50%;
+  background: var(--muted);
+  content: '';
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.settings-toggle input:checked + span {
+  border-color: color-mix(in srgb, var(--success), transparent 45%);
+  background: color-mix(in srgb, var(--success), transparent 76%);
+}
+
+.settings-toggle input:checked + span::after {
+  background: var(--success);
+  transform: translateX(1.24rem);
+}
+
+.settings-toggle input:focus-visible + span {
+  outline: 2px solid color-mix(in srgb, var(--accent), transparent 72%);
+  outline-offset: 2px;
+}
+
+.settings-toggle.forced {
+  opacity: 0.72;
+}
+
+.settings-toggle.forced input {
+  cursor: not-allowed;
+}
+
+.developer-mode-row > div {
+  max-width: 42rem;
+}
+
 @keyframes update-failed-enter {
   from {
     opacity: 0;

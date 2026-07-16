@@ -4,6 +4,7 @@
   import SectionHeader from '$lib/components/SectionHeader.svelte';
   import {
     getGameSupport,
+    installDevelopmentAgent,
     installBepInEx,
     installMods,
     listenToAgentEvents,
@@ -30,10 +31,12 @@
   } from '$lib/api/steam';
   import { t } from '$lib/i18n';
   import { activeLanguageStore } from '$lib/stores/language';
+  import { developerModeStore } from '$lib/stores/developerMode';
 
   type LoadState = 'loading' | 'ready' | 'error';
   type PendingAction =
     | { kind: 'bepinexInstall'; plan: BepInExInstallPlan }
+    | { kind: 'developmentAgent'; appId: number }
     | {
         kind: 'bepinexUninstall';
         plan: { planId: string; appId: number; version: string; additionalFileCount: number };
@@ -267,6 +270,12 @@
     }
   }
 
+  async function prepareDevelopmentAgent() {
+    if (!selectedGame) return;
+    pageError = '';
+    await showAction({ kind: 'developmentAgent', appId: selectedGame.appId });
+  }
+
   function closeConfirmation() {
     confirmationDialog.close();
     pendingAction = undefined;
@@ -289,6 +298,8 @@
         await installBepInEx(action.plan.planId, (next) => (progress = next));
       } else if (action.kind === 'bepinexUninstall') {
         await uninstallBepInEx(action.plan.planId);
+      } else if (action.kind === 'developmentAgent') {
+        support = await installDevelopmentAgent(action.appId);
       } else if (action.plan.action === 'install') {
         support = await installMods(action.plan.planId);
       } else if (action.plan.action === 'update') {
@@ -362,6 +373,7 @@
   function actionTitle(action: PendingAction): string {
     if (action.kind === 'bepinexInstall') return $t('steamGames.bepInEx.confirmTitle');
     if (action.kind === 'bepinexUninstall') return $t('steamGames.bepInEx.uninstallTitle');
+    if (action.kind === 'developmentAgent') return $t('steamGames.developerAgent.confirmTitle');
     return $t(`steamGames.mods.confirm.${action.plan.action}Title`);
   }
 
@@ -373,6 +385,9 @@
         runtime: action.plan.runtime,
         architecture: action.plan.architecture.toUpperCase()
       });
+    }
+    if (action.kind === 'developmentAgent') {
+      return $t('steamGames.developerAgent.confirmDescription', { game: selectedGame?.name ?? '' });
     }
     if (action.kind === 'bepinexUninstall') {
       return $t('steamGames.bepInEx.uninstallDescription', {
@@ -401,11 +416,15 @@
         <h1>{selectedGame.name}</h1>
         {#if selectedRuntimeLabel}<p>{selectedRuntimeLabel}</p>{/if}
       </div>
-      {#if support}
-        <span class:connected={support.agentStatus === 'connected'} class="agent-state">
-          {$t(`steamGames.agent.${support.agentStatus}`)}
-        </span>
-      {/if}
+      <span class="agent-state-slot">
+        {#if supportLoading}
+          <span class="skeleton-line skeleton-agent-state" aria-hidden="true"></span>
+        {:else if support}
+          <span class:connected={support.agentStatus === 'connected'} class="agent-state">
+            {$t(`steamGames.agent.${support.agentStatus}`)}
+          </span>
+        {/if}
+      </span>
     </div>
 
     <article class="detail-card">
@@ -436,6 +455,12 @@
           {:else if selectedGame.bepInEx.status === 'installed'}
             <span class="managed-note">{$t('steamGames.bepInEx.manualInstall')}</span>
           {/if}
+          {#if $developerModeStore.enabled && selectedGame.bepInEx.status === 'installed'}
+            <button class="secondary-action developer-agent-action" type="button" disabled={actionBusy || busyModId !== undefined} on:click={prepareDevelopmentAgent}>
+              <span class="material-symbols-rounded" aria-hidden="true">developer_mode</span>
+              {$t('steamGames.developerAgent.install')}
+            </button>
+          {/if}
         </div>
       </div>
       {#if progress}
@@ -451,61 +476,62 @@
       </div>
     {/if}
 
-    {#if supportLoading}
-      <div class="detail-skeleton" role="status" aria-live="polite">
-        <span class="sr-only">{$t('steamGames.detail.loading')}</span>
-        <div class="mods-heading skeleton-heading" aria-hidden="true">
+    <div class="detail-content">
+      {#if supportLoading}
+        <div class="detail-skeleton" role="status" aria-live="polite">
+          <span class="sr-only">{$t('steamGames.detail.loading')}</span>
+          <div class="mods-heading skeleton-heading" aria-hidden="true">
+            <div>
+              <span class="skeleton-line skeleton-eyebrow"></span>
+              <span class="skeleton-line skeleton-section-title"></span>
+            </div>
+          </div>
+          <div class="mod-list" aria-hidden="true">
+            <div class="mod-card mod-skeleton">
+              <div class="mod-skeleton-copy">
+                <span class="skeleton-line skeleton-mod-title"></span>
+                <span class="skeleton-line skeleton-description"></span>
+                <span class="skeleton-line skeleton-description short"></span>
+              </div>
+              <span class="skeleton-line skeleton-action"></span>
+            </div>
+            <div class="mod-card mod-skeleton">
+              <div class="mod-skeleton-copy">
+                <span class="skeleton-line skeleton-mod-title short"></span>
+                <span class="skeleton-line skeleton-description"></span>
+                <span class="skeleton-line skeleton-description medium"></span>
+              </div>
+              <span class="skeleton-line skeleton-action"></span>
+            </div>
+          </div>
+        </div>
+      {:else if support?.status === 'unsupported'}
+        <div class="unsupported-state" role="status">
+          <span class="material-symbols-rounded" aria-hidden="true">extension_off</span>
+          <h2>{$t('steamGames.detail.unsupportedTitle')}</h2>
+          <p>{$t('steamGames.detail.unsupportedDescription')}</p>
+        </div>
+      {:else if support?.status === 'unavailable'}
+        <div class="unsupported-state error" role="alert">
+          <h2>{$t('steamGames.detail.unavailableTitle')}</h2>
+          <p>{$t('steamGames.detail.unavailableDescription')}</p>
+          <button class="secondary-action" type="button" on:click={() => openGame(selectedGame!)}>
+            {$t('steamGames.detail.retry')}
+          </button>
+        </div>
+      {:else if support?.status === 'supported'}
+        <div class="mods-heading">
           <div>
-            <span class="skeleton-line skeleton-eyebrow"></span>
-            <span class="skeleton-line skeleton-section-title"></span>
+            <p class="eyebrow">{$t('steamGames.mods.eyebrow')}</p>
+            <h2>{$t('steamGames.mods.title')}</h2>
           </div>
+          {#if support.cached}<span class="catalog-cache">{$t('steamGames.mods.cached')}</span>{/if}
         </div>
-        <div class="mod-list" aria-hidden="true">
-          <div class="mod-card mod-skeleton">
-            <div class="mod-skeleton-copy">
-              <span class="skeleton-line skeleton-mod-title"></span>
-              <span class="skeleton-line skeleton-description"></span>
-              <span class="skeleton-line skeleton-description short"></span>
-            </div>
-            <span class="skeleton-line skeleton-action"></span>
-          </div>
-          <div class="mod-card mod-skeleton">
-            <div class="mod-skeleton-copy">
-              <span class="skeleton-line skeleton-mod-title short"></span>
-              <span class="skeleton-line skeleton-description"></span>
-              <span class="skeleton-line skeleton-description medium"></span>
-            </div>
-            <span class="skeleton-line skeleton-action"></span>
-          </div>
-        </div>
-      </div>
-    {:else if support?.status === 'unsupported'}
-      <div class="unsupported-state" role="status">
-        <span class="material-symbols-rounded" aria-hidden="true">extension_off</span>
-        <h2>{$t('steamGames.detail.unsupportedTitle')}</h2>
-        <p>{$t('steamGames.detail.unsupportedDescription')}</p>
-      </div>
-    {:else if support?.status === 'unavailable'}
-      <div class="unsupported-state error" role="alert">
-        <h2>{$t('steamGames.detail.unavailableTitle')}</h2>
-        <p>{$t('steamGames.detail.unavailableDescription')}</p>
-        <button class="secondary-action" type="button" on:click={() => openGame(selectedGame!)}>
-          {$t('steamGames.detail.retry')}
-        </button>
-      </div>
-    {:else if support?.status === 'supported'}
-      <div class="mods-heading">
-        <div>
-          <p class="eyebrow">{$t('steamGames.mods.eyebrow')}</p>
-          <h2>{$t('steamGames.mods.title')}</h2>
-        </div>
-        {#if support.cached}<span class="catalog-cache">{$t('steamGames.mods.cached')}</span>{/if}
-      </div>
-      {#if support.mods.length === 0}
-        <p class="game-list-status" role="status">{$t('steamGames.mods.empty')}</p>
-      {:else}
-        <div class="mod-list">
-          {#each support.mods as mod (mod.modId)}
+        {#if support.mods.length === 0}
+          <p class="game-list-status" role="status">{$t('steamGames.mods.empty')}</p>
+        {:else}
+          <div class="mod-list">
+            {#each support.mods as mod (mod.modId)}
             <article class:busy={busyModId === mod.modId} class="mod-card">
               <header>
                 <div>
@@ -631,11 +657,12 @@
                   </div>
                 </div>
               {/if}
-            </article>
-          {/each}
-        </div>
+              </article>
+            {/each}
+          </div>
+        {/if}
       {/if}
-    {/if}
+    </div>
   </section>
 {:else}
   <section class="single-panel glass-panel" aria-busy={loadState === 'loading'}>

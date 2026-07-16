@@ -17,6 +17,16 @@ pub async fn get_game_support(
 }
 
 #[tauri::command]
+pub async fn install_development_agent(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    app_id: u32,
+) -> AppResult<GameSupport> {
+    crate::agent::install_development_agent(&app, &state, app_id).await?;
+    game_mods::get_support(&app, &state, app_id).await
+}
+
+#[tauri::command]
 pub async fn prepare_mod_install(
     app: AppHandle,
     state: State<'_, AppState>,

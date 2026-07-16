@@ -96,8 +96,4 @@
     animation: none !important;
   }
 
-  .skeleton-line::after {
-    display: none;
-  }
-
 }

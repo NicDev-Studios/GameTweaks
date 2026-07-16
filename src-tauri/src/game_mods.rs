@@ -2529,7 +2529,7 @@ async fn consume_plan(state: &AppState, plan_id: &str) -> AppResult<PreparedActi
     Ok(plan.action)
 }
 
-async fn mark_busy(state: &AppState, app_id: u32) -> AppResult<()> {
+pub(crate) async fn mark_busy(state: &AppState, app_id: u32) -> AppResult<()> {
     if !state.game_mods.lock().await.busy_games.insert(app_id) {
         return Err(mod_error(
             "mod_busy",
@@ -2537,6 +2537,11 @@ async fn mark_busy(state: &AppState, app_id: u32) -> AppResult<()> {
         ));
     }
     Ok(())
+}
+
+#[cfg(windows)]
+pub(crate) async fn clear_busy(state: &AppState, app_id: u32) {
+    state.game_mods.lock().await.busy_games.remove(&app_id);
 }
 
 fn prune_plans(plans: &mut HashMap<String, PreparedPlan>) {

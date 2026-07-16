@@ -18,11 +18,17 @@ use sha2::Sha256;
 #[cfg(windows)]
 use tauri::Emitter;
 use tauri::{AppHandle, Manager};
+#[cfg(windows)]
+use tempfile::Builder as TempBuilder;
 use tokio::sync::oneshot;
 
 #[cfg(windows)]
-use crate::bepinex::analyze_windows_installation;
+use crate::bepinex::{
+    analyze_windows_installation, ensure_game_stopped, ensure_no_anti_cheat, resolve_game,
+    BepInExAvailability,
+};
 use crate::bepinex::{BepInExRuntime, InstallTarget};
+use crate::config::model::developer_mode_enabled;
 use crate::core::error::{AppError, AppResult, ErrorResponse};
 use crate::core::state::AppState;
 use crate::game_mods::{ConfigField, GameMod, GameModStatus, LocalizedText, ModIntegration};
@@ -374,6 +380,92 @@ pub(crate) fn bundled_agent_meets(minimum: Option<&str>) -> bool {
     minimum.map_or(true, |minimum| {
         semver::Version::parse(AGENT_VERSION).ok() >= semver::Version::parse(minimum).ok()
     })
+}
+
+pub async fn install_development_agent(
+    app: &AppHandle,
+    state: &AppState,
+    app_id: u32,
+) -> AppResult<()> {
+    let developer_mode = {
+        let config = state.config.read().await;
+        developer_mode_enabled(&config)
+    };
+    if !developer_mode {
+        return Err(agent_error(
+            "developer_mode_required",
+            "developer mode is required to install the development agent",
+        ));
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (app, app_id);
+        Err(agent_error(
+            "agent_unsupported",
+            "the GameTweaks agent is currently available on Windows only",
+        ))
+    }
+
+    #[cfg(windows)]
+    {
+        crate::game_mods::mark_busy(state, app_id).await?;
+        let result = install_development_agent_inner(app, app_id).await;
+        crate::game_mods::clear_busy(state, app_id).await;
+        result
+    }
+}
+
+#[cfg(windows)]
+async fn install_development_agent_inner(app: &AppHandle, app_id: u32) -> AppResult<()> {
+    let game = resolve_game(app_id).await?;
+    let (status, target) = analyze_windows_installation(&game.install_directory).map_err(|_| {
+        agent_error(
+            "agent_install_blocked",
+            "the game installation is not compatible with the development agent",
+        )
+    })?;
+    if status.status != BepInExAvailability::Installed {
+        return Err(agent_error(
+            "mod_requires_bepinex",
+            "BepInEx must be installed before the development agent",
+        ));
+    }
+    ensure_no_anti_cheat(&target.game_root)?;
+    ensure_game_stopped(&target.executable)?;
+
+    let staging = TempBuilder::new()
+        .prefix(".gametweaks-agent-")
+        .tempdir_in(&target.game_root)
+        .map_err(|_| {
+            agent_error(
+                "agent_install_error",
+                "a development agent staging directory could not be created",
+            )
+        })?;
+    stage_bundled_agent(app, &target, staging.path())?;
+    ensure_game_stopped(&target.executable)?;
+
+    let rollback_root = staging.path().join("rollback");
+    fs::create_dir(&rollback_root).map_err(|_| {
+        agent_error(
+            "agent_install_error",
+            "the development agent rollback directory could not be created",
+        )
+    })?;
+    let Some((_, previous)) = commit_staged_agent(&target, staging.path(), app_id, &rollback_root)?
+    else {
+        return Err(agent_error(
+            "agent_install_error",
+            "the development agent was not staged",
+        ));
+    };
+    if let Some(previous) = previous {
+        if let Err(error) = fs::remove_dir_all(previous) {
+            tracing::warn!(%error, "failed to clean up the previous development agent");
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn stage_bundled_agent(

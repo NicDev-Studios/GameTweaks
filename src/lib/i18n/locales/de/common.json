@@ -37,6 +37,11 @@
       "incompatible": "Agent inkompatibel",
       "ambiguous": "Mehrere Spielinstanzen"
     },
+    "developerAgent": {
+      "install": "Dev-Agent installieren / reparieren",
+      "confirmTitle": "Development Agent installieren",
+      "confirmDescription": "Den gebündelten GameTweaks-Agent für {game} installieren oder sicher reparieren?"
+    },
     "mods": {
       "eyebrow": "GameTweaks-Katalog",
       "title": "Mods",
@@ -95,6 +100,8 @@
       "mod_schema_conflict": "Eine Live-Agent-Einstellung widerspricht dem geprüften Katalogschema.",
       "mod_agent_required": "Schließe das Spiel oder verbinde den GameTweaks-Agenten, bevor du Einstellungen änderst.",
       "agent_unavailable": "Der passende GameTweaks-Agent-Build ist nicht verfügbar.",
+      "agent_unsupported": "Der GameTweaks-Agent ist derzeit nur unter Windows verfügbar.",
+      "agent_install_blocked": "Die Spielinstallation ist nicht mit dem Development Agent kompatibel.",
       "agent_collision": "Eine vorhandene Agent-Installation wird nicht sicher von GameTweaks verwaltet.",
       "agent_install_error": "Der GameTweaks-Agent konnte nicht sicher installiert werden.",
       "agent_security_error": "Das Sicherheitsmaterial des Agenten konnte nicht erstellt werden.",
@@ -102,6 +109,8 @@
       "agent_disconnected": "Die Verbindung zum Spiel-Agenten wurde getrennt.",
       "agent_timeout": "Der Spiel-Agent hat die Änderung nicht rechtzeitig bestätigt.",
       "agent_config_rejected": "Der Mod hat diese Konfigurationsänderung abgelehnt.",
+      "developer_mode_required": "Aktiviere zuerst den Developer Mode in den Einstellungen.",
+      "bepinex_blocked": "Die Änderung wurde wegen unsicherer oder kollidierender Spieldateien blockiert.",
       "bepinex_game_running": "Schließe das Spiel, bevor seine Dateien verändert werden.",
       "bepinex_not_managed": "Nur von GameTweaks installierte BepInEx-Versionen können entfernt werden.",
       "bepinex_uninstall_unsupported": "Die BepInEx-Deinstallation ist derzeit nur unter Windows verfügbar.",
@@ -164,13 +173,19 @@
   "settings": {
     "eyebrow": "Präferenzen",
     "title": "Einstellungen",
-    "description": "Passe die Oberfläche an dein System an oder lege ein festes Erscheinungsbild fest.",
+    "description": "Verwalte Oberfläche, Updates und optionale Entwicklungswerkzeuge.",
     "language": {
       "title": "Sprache",
       "description": "Sprache der Oberfläche",
       "ariaLabel": "Sprache",
       "automatic": "Deutsch (Automatisch)",
       "english": "English"
+    },
+    "developerMode": {
+      "title": "Developer Mode",
+      "description": "Aktiviert lokale Mod-Entwicklungswerkzeuge. Installiere nur Plugins, deren Code du vertraust.",
+      "forcedDescription": "In lokalen Development-Builds ist der Developer Mode immer aktiv.",
+      "ariaLabel": "Developer Mode aktivieren"
     }
   },
   "updates": {

@@ -1,7 +1,10 @@
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
-use crate::config::model::{LanguagePreference, ThemePreference, UpdateChannel};
+use crate::config::model::{
+    developer_mode_enabled, developer_mode_forced, LanguagePreference, ThemePreference,
+    UpdateChannel,
+};
 use crate::config::store::save_config;
 use crate::core::error::AppResult;
 use crate::core::state::AppState;
@@ -16,6 +19,13 @@ pub struct AppOverview {
     pub name: &'static str,
     pub version: &'static str,
     pub config_version: u32,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeveloperModeState {
+    pub enabled: bool,
+    pub forced: bool,
 }
 
 #[tauri::command]
@@ -61,6 +71,32 @@ pub async fn set_language_preference(
     config.language = language;
     save_config(&app, &config)?;
     Ok(config.language.clone())
+}
+
+#[tauri::command]
+pub async fn get_developer_mode(state: State<'_, AppState>) -> AppResult<DeveloperModeState> {
+    let config = state.config.read().await;
+    Ok(DeveloperModeState {
+        enabled: developer_mode_enabled(&config),
+        forced: developer_mode_forced(),
+    })
+}
+
+#[tauri::command]
+pub async fn set_developer_mode(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> AppResult<DeveloperModeState> {
+    let mut config = state.config.write().await;
+    if !developer_mode_forced() {
+        config.developer_mode = enabled;
+        save_config(&app, &config)?;
+    }
+    Ok(DeveloperModeState {
+        enabled: developer_mode_enabled(&config),
+        forced: developer_mode_forced(),
+    })
 }
 
 #[tauri::command]

@@ -8,6 +8,11 @@ export interface AppOverview {
   configVersion: number;
 }
 
+export interface DeveloperModeState {
+  enabled: boolean;
+  forced: boolean;
+}
+
 export function getAppOverview(): Promise<AppOverview> {
   return invoke<AppOverview>('get_app_overview');
 }
@@ -26,4 +31,12 @@ export function getLanguagePreference(): Promise<LanguageMode> {
 
 export function setLanguagePreference(language: LanguageMode): Promise<LanguageMode> {
   return invoke<LanguageMode>('set_language_preference', { language });
+}
+
+export function getDeveloperMode(): Promise<DeveloperModeState> {
+  return invoke<DeveloperModeState>('get_developer_mode');
+}
+
+export function setDeveloperMode(enabled: boolean): Promise<DeveloperModeState> {
+  return invoke<DeveloperModeState>('set_developer_mode', { enabled });
 }

@@ -47,6 +47,20 @@ built and tested independently:
 dotnet test agent/tests/GameTweaks.Agent.Core.Tests/GameTweaks.Agent.Core.Tests.csproj
 ```
 
+## Local mod development
+
+Enable **Developer Mode** in the desktop app settings. Local `pnpm dev` builds
+force it on. After BepInEx is installed and the game is closed, open the game
+details and select **Install / repair dev agent**. GameTweaks creates the
+per-game marker and authentication secret and installs the matching bundled
+Agent safely.
+
+Copy a development plugin to
+`BepInEx/plugins/GameTweaks/<mod-id>/`. A plugin that registers through
+`GameTweaks.Agent.Abstractions` appears as `External` while the game and desktop
+app are connected. External development plugins can expose live configuration,
+but GameTweaks does not install, update, uninstall, or mark them Official.
+
 ## Mod SDK usage
 
 Register after `GameTweaksApi.Available` fires (or immediately when

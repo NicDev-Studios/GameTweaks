@@ -657,6 +657,18 @@ fn contains_anti_cheat(game_root: &Path) -> Result<bool, BepInExGameStatus> {
     Ok(false)
 }
 
+#[cfg(windows)]
+pub(crate) fn ensure_no_anti_cheat(game_root: &Path) -> AppResult<()> {
+    match contains_anti_cheat(game_root) {
+        Ok(false) => Ok(()),
+        Ok(true) => Err(bepinex_error(
+            "bepinex_blocked",
+            "anti-cheat files were detected in the game directory",
+        )),
+        Err(status) => Err(status_error(status)),
+    }
+}
+
 fn is_anti_cheat_name(name: &str) -> bool {
     name == "easyanticheat"
         || name == "easyanticheat_eos"

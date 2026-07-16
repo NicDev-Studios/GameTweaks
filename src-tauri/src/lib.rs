@@ -9,16 +9,16 @@ pub mod updater;
 pub mod version;
 
 use crate::commands::app::{
-    check_for_update, download_and_install_update, get_app_overview, get_language_preference,
-    get_theme_preference, get_update_channel, set_language_preference, set_theme_preference,
-    set_update_channel,
+    check_for_update, download_and_install_update, get_app_overview, get_developer_mode,
+    get_language_preference, get_theme_preference, get_update_channel, set_developer_mode,
+    set_language_preference, set_theme_preference, set_update_channel,
 };
 use crate::commands::bepinex::{
     install_bepinex, prepare_bepinex_install, prepare_bepinex_uninstall, uninstall_bepinex,
 };
 use crate::commands::game_mods::{
-    get_game_support, install_mods, prepare_mod_install, prepare_mod_uninstall, prepare_mod_update,
-    set_mod_config, uninstall_mod, update_mod,
+    get_game_support, install_development_agent, install_mods, prepare_mod_install,
+    prepare_mod_uninstall, prepare_mod_update, set_mod_config, uninstall_mod, update_mod,
 };
 use crate::commands::steam::list_steam_games;
 use crate::config::store::load_config;
@@ -65,8 +65,10 @@ pub fn run() {
             check_for_update,
             download_and_install_update,
             get_app_overview,
+            get_developer_mode,
             get_language_preference,
             install_bepinex,
+            install_development_agent,
             install_mods,
             get_game_support,
             list_steam_games,
@@ -79,6 +81,7 @@ pub fn run() {
             get_theme_preference,
             get_update_channel,
             set_language_preference,
+            set_developer_mode,
             set_theme_preference,
             set_update_channel,
             uninstall_bepinex,

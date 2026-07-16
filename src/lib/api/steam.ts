@@ -193,6 +193,10 @@ export function getGameSupport(appId: number): Promise<GameSupport> {
   return invoke<GameSupport>('get_game_support', { appId });
 }
 
+export function installDevelopmentAgent(appId: number): Promise<GameSupport> {
+  return invoke<GameSupport>('install_development_agent', { appId });
+}
+
 export function prepareBepInExUninstall(appId: number): Promise<BepInExUninstallPlan> {
   return invoke<BepInExUninstallPlan>('prepare_bepinex_uninstall', { appId });
 }
