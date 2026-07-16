@@ -23,7 +23,8 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>gametweaks;bepinex;unity;modding;sdk</PackageTags>
     <PackageReadmeFile>SDK.md</PackageReadmeFile>
-    <BuildOutputTargetFolder>ref</BuildOutputTargetFolder>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackReferenceAssembly</TargetsForTfmSpecificContentInPackage>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <Deterministic>true</Deterministic>
@@ -31,4 +32,11 @@
   <ItemGroup>
     <None Include="../../SDK.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+  <Target Name="PackReferenceAssembly">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(TargetPath)">
+        <PackagePath>ref/$(TargetFramework)/$(TargetFileName)</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
 </Project>
