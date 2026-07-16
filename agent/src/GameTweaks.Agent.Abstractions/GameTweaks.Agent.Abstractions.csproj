@@ -14,6 +14,10 @@
     <NuspecFile>GameTweaks.Agent.Abstractions.nuspec</NuspecFile>
     <NuspecBasePath>$(MSBuildProjectDirectory)</NuspecBasePath>
     <NuspecProperties>version=$(Version);configuration=$(Configuration)</NuspecProperties>
+    <!-- NU5131 cannot model a PackageReference-only package that intentionally
+         contains a ref assembly without a legacy lib assembly. The packaging
+         smoke test verifies the resulting compile/runtime asset contract. -->
+    <NoWarn>$(NoWarn);NU5131</NoWarn>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
 </Project>

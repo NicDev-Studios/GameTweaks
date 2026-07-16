@@ -20,10 +20,14 @@ $namespace.AddNamespace("n", $nuspecDocument.DocumentElement.NamespaceURI)
 if ($nuspecDocument.SelectSingleNode("/n:package/n:metadata/n:references", $namespace)) {
     throw "A ref-only PackageReference package must not declare legacy nuspec references."
 }
-$referenceFile = $nuspecDocument.SelectSingleNode(
-    "/n:package/n:files/n:file[contains(@target, 'ref\\netstandard2.0')]",
-    $namespace)
-if ($null -eq $referenceFile) {
+$referenceFiles = @($nuspecDocument.SelectNodes("/n:package/n:files/n:file", $namespace))
+$referenceFile = $referenceFiles | Where-Object {
+    ($_.target -replace "\\", "/").TrimEnd("/") -eq "ref/netstandard2.0" -and
+    ($_.src -replace "\\", "/").EndsWith(
+        "/GameTweaks.Agent.Abstractions.dll",
+        [System.StringComparison]::OrdinalIgnoreCase)
+}
+if (@($referenceFile).Count -ne 1) {
     throw "The Agent SDK nuspec must place its assembly under ref/netstandard2.0."
 }
 
