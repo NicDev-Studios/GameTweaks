@@ -31,14 +31,16 @@
       "confirm": "Bestätigen"
     },
     "agent": {
-      "disconnected": "Agent getrennt",
-      "connecting": "Agent verbindet",
+      "notInstalled": "Agent nicht installiert",
+      "installedDisconnected": "Agent installiert · getrennt",
+      "installedConnecting": "Agent installiert · verbindet",
       "connected": "Agent verbunden",
-      "incompatible": "Agent inkompatibel",
-      "ambiguous": "Mehrere Spielinstanzen"
+      "installedIncompatible": "Agent installiert · inkompatibel",
+      "installedAmbiguous": "Agent installiert · mehrere Instanzen"
     },
     "developerAgent": {
-      "install": "Dev-Agent installieren / reparieren",
+      "install": "Dev-Agent installieren",
+      "repair": "Dev-Agent reparieren",
       "confirmTitle": "Development Agent installieren",
       "confirmDescription": "Den gebündelten GameTweaks-Agent für {game} installieren oder sicher reparieren?"
     },

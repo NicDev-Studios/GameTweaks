@@ -376,6 +376,10 @@ pub(crate) fn agent_is_current(target: &InstallTarget, app_id: u32) -> bool {
         .is_some_and(|marker| marker.app_id == app_id && marker.version == AGENT_VERSION)
 }
 
+pub(crate) fn agent_is_installed(target: &InstallTarget, app_id: u32) -> bool {
+    valid_agent_install(target).is_some_and(|marker| marker.app_id == app_id)
+}
+
 pub(crate) fn bundled_agent_meets(minimum: Option<&str>) -> bool {
     minimum.map_or(true, |minimum| {
         semver::Version::parse(AGENT_VERSION).ok() >= semver::Version::parse(minimum).ok()
@@ -1214,6 +1218,36 @@ mod windows_pipe {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn distinguishes_installed_and_current_agents() {
+        let root = tempfile::tempdir().unwrap();
+        let target = InstallTarget {
+            game_root: root.path().to_path_buf(),
+            executable: root.path().join("game.exe"),
+            runtime: BepInExRuntime::Mono,
+            architecture: crate::bepinex::BepInExArchitecture::X64,
+        };
+        let directory = agent_directory(&target);
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("agent.dll"), b"agent").unwrap();
+        write_marker(
+            &directory.join(".gametweaks-agent.json"),
+            &AgentMarker {
+                schema_version: 1,
+                app_id: 2709570,
+                version: "0.0.9".to_owned(),
+                runtime: BepInExRuntime::Mono,
+                secret: "11".repeat(32),
+                files: vec!["agent.dll".to_owned()],
+            },
+        )
+        .unwrap();
+
+        assert!(agent_is_installed(&target, 2709570));
+        assert!(!agent_is_current(&target, 2709570));
+        assert!(!agent_is_installed(&target, 10));
+    }
 
     #[test]
     fn challenge_proof_is_stable_and_context_bound() {

@@ -31,14 +31,16 @@
       "confirm": "Confirm"
     },
     "agent": {
-      "disconnected": "Agent disconnected",
-      "connecting": "Agent connecting",
+      "notInstalled": "Agent not installed",
+      "installedDisconnected": "Agent installed · disconnected",
+      "installedConnecting": "Agent installed · connecting",
       "connected": "Agent connected",
-      "incompatible": "Agent incompatible",
-      "ambiguous": "Multiple game instances"
+      "installedIncompatible": "Agent installed · incompatible",
+      "installedAmbiguous": "Agent installed · multiple instances"
     },
     "developerAgent": {
-      "install": "Install / repair dev agent",
+      "install": "Install dev agent",
+      "repair": "Repair dev agent",
       "confirmTitle": "Install development agent",
       "confirmDescription": "Install or safely repair the bundled GameTweaks agent for {game}?"
     },

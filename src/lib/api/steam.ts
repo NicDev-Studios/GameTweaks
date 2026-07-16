@@ -107,6 +107,7 @@ export interface GameSupport {
   status: GameSupportStatus;
   name?: LocalizedText;
   mods: GameMod[];
+  agentInstalled: boolean;
   agentStatus: AgentConnectionStatus;
   cached: boolean;
 }

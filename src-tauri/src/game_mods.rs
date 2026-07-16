@@ -547,6 +547,7 @@ pub struct GameSupport {
     pub status: GameSupportStatus,
     pub name: Option<LocalizedText>,
     pub mods: Vec<GameMod>,
+    pub agent_installed: bool,
     pub agent_status: AgentConnectionStatus,
     pub cached: bool,
 }
@@ -643,11 +644,14 @@ struct ModProgress {
 
 pub async fn get_support(app: &AppHandle, state: &AppState, app_id: u32) -> AppResult<GameSupport> {
     let game = resolve_game(app_id).await?;
+    let target = analyze_windows_installation(&game.install_directory)
+        .ok()
+        .map(|(_, target)| target);
+    let agent_installed = target
+        .as_ref()
+        .is_some_and(|target| agent::agent_is_installed(target, app_id));
     match load_catalog(app, state, app_id).await {
         Ok((catalog, definitions, cached)) => {
-            let target = analyze_windows_installation(&game.install_directory)
-                .ok()
-                .map(|(_, target)| target);
             let mods = definitions
                 .values()
                 .map(|definition| describe_mod(target.as_ref(), app_id, definition))
@@ -667,14 +671,29 @@ pub async fn get_support(app: &AppHandle, state: &AppState, app_id: u32) -> AppR
                 status: GameSupportStatus::Supported,
                 name: Some(catalog.name),
                 mods,
+                agent_installed,
                 agent_status: agent::connection_status(state, app_id).await,
                 cached,
             })
         }
         Err(error) if error.code == "game_not_supported" => {
-            support_without_catalog(state, app_id, GameSupportStatus::Unsupported).await
+            support_without_catalog(
+                state,
+                app_id,
+                GameSupportStatus::Unsupported,
+                agent_installed,
+            )
+            .await
         }
-        Err(_) => support_without_catalog(state, app_id, GameSupportStatus::Unavailable).await,
+        Err(_) => {
+            support_without_catalog(
+                state,
+                app_id,
+                GameSupportStatus::Unavailable,
+                agent_installed,
+            )
+            .await
+        }
     }
 }
 
@@ -682,6 +701,7 @@ async fn support_without_catalog(
     state: &AppState,
     app_id: u32,
     status: GameSupportStatus,
+    agent_installed: bool,
 ) -> AppResult<GameSupport> {
     let mut mods = agent::external_mods(state, app_id).await;
     apply_restart_flags(state, app_id, &mut mods).await;
@@ -690,6 +710,7 @@ async fn support_without_catalog(
         status,
         name: None,
         mods,
+        agent_installed,
         agent_status: agent::connection_status(state, app_id).await,
         cached: false,
     })

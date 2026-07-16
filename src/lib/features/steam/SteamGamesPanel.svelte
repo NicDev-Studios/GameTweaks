@@ -47,7 +47,7 @@
   let loadState: LoadState = 'loading';
   let selectedGame: SteamGame | undefined;
   let support: GameSupport | undefined;
-  let supportLoading = false;
+  let openingGameId: number | undefined;
   let actionBusy = false;
   let busyModId: string | undefined;
   let pageError = '';
@@ -111,18 +111,24 @@
   }
 
   async function openGame(game: SteamGame) {
-    selectedGame = game;
-    support = undefined;
+    if (openingGameId !== undefined) return;
+    const isRetry = selectedGame?.appId === game.appId;
+    openingGameId = game.appId;
     pageError = '';
-    modErrors = {};
-    supportLoading = true;
+    if (!isRetry) modErrors = {};
     try {
-      support = await getGameSupport(game.appId);
+      const nextSupport = await getGameSupport(game.appId);
+      selectedGame = game;
+      support = nextSupport;
       resetDrafts();
     } catch (error) {
+      if (!isRetry) {
+        selectedGame = game;
+        support = undefined;
+      }
       pageError = errorMessage(error);
     } finally {
-      supportLoading = false;
+      openingGameId = undefined;
     }
   }
 
@@ -214,6 +220,23 @@
 
   function reasonLabel(reason?: BepInExReason): string {
     return $t(`steamGames.bepInEx.reasons.${reason ?? 'inspectionFailed'}`);
+  }
+
+  function agentStatusLabel(current: GameSupport): string {
+    if (!current.agentInstalled) return $t('steamGames.agent.notInstalled');
+    if (current.agentStatus === 'disconnected') {
+      return $t('steamGames.agent.installedDisconnected');
+    }
+    if (current.agentStatus === 'connecting') {
+      return $t('steamGames.agent.installedConnecting');
+    }
+    if (current.agentStatus === 'incompatible') {
+      return $t('steamGames.agent.installedIncompatible');
+    }
+    if (current.agentStatus === 'ambiguous') {
+      return $t('steamGames.agent.installedAmbiguous');
+    }
+    return $t('steamGames.agent.connected');
   }
 
   async function showAction(action: PendingAction) {
@@ -404,7 +427,7 @@
 
 {#if selectedGame}
   {@const selectedRuntimeLabel = runtimeLabel(selectedGame)}
-  <section class="single-panel glass-panel game-detail" aria-busy={supportLoading || actionBusy || busyModId !== undefined}>
+  <section class="single-panel glass-panel game-detail" aria-busy={openingGameId !== undefined || actionBusy || busyModId !== undefined}>
     <button class="detail-back" type="button" on:click={closeGame}>
       <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
       {$t('steamGames.detail.back')}
@@ -417,11 +440,13 @@
         {#if selectedRuntimeLabel}<p>{selectedRuntimeLabel}</p>{/if}
       </div>
       <span class="agent-state-slot">
-        {#if supportLoading}
-          <span class="skeleton-line skeleton-agent-state" aria-hidden="true"></span>
-        {:else if support}
-          <span class:connected={support.agentStatus === 'connected'} class="agent-state">
-            {$t(`steamGames.agent.${support.agentStatus}`)}
+        {#if support}
+          <span
+            class:connected={support.agentStatus === 'connected'}
+            class:installed={support.agentInstalled}
+            class="agent-state"
+          >
+            {agentStatusLabel(support)}
           </span>
         {/if}
       </span>
@@ -458,7 +483,11 @@
           {#if $developerModeStore.enabled && selectedGame.bepInEx.status === 'installed'}
             <button class="secondary-action developer-agent-action" type="button" disabled={actionBusy || busyModId !== undefined} on:click={prepareDevelopmentAgent}>
               <span class="material-symbols-rounded" aria-hidden="true">developer_mode</span>
-              {$t('steamGames.developerAgent.install')}
+              {$t(
+                support?.agentInstalled
+                  ? 'steamGames.developerAgent.repair'
+                  : 'steamGames.developerAgent.install'
+              )}
             </button>
           {/if}
         </div>
@@ -477,35 +506,7 @@
     {/if}
 
     <div class="detail-content">
-      {#if supportLoading}
-        <div class="detail-skeleton" role="status" aria-live="polite">
-          <span class="sr-only">{$t('steamGames.detail.loading')}</span>
-          <div class="mods-heading skeleton-heading" aria-hidden="true">
-            <div>
-              <span class="skeleton-line skeleton-eyebrow"></span>
-              <span class="skeleton-line skeleton-section-title"></span>
-            </div>
-          </div>
-          <div class="mod-list" aria-hidden="true">
-            <div class="mod-card mod-skeleton">
-              <div class="mod-skeleton-copy">
-                <span class="skeleton-line skeleton-mod-title"></span>
-                <span class="skeleton-line skeleton-description"></span>
-                <span class="skeleton-line skeleton-description short"></span>
-              </div>
-              <span class="skeleton-line skeleton-action"></span>
-            </div>
-            <div class="mod-card mod-skeleton">
-              <div class="mod-skeleton-copy">
-                <span class="skeleton-line skeleton-mod-title short"></span>
-                <span class="skeleton-line skeleton-description"></span>
-                <span class="skeleton-line skeleton-description medium"></span>
-              </div>
-              <span class="skeleton-line skeleton-action"></span>
-            </div>
-          </div>
-        </div>
-      {:else if support?.status === 'unsupported'}
+      {#if support?.status === 'unsupported'}
         <div class="unsupported-state" role="status">
           <span class="material-symbols-rounded" aria-hidden="true">extension_off</span>
           <h2>{$t('steamGames.detail.unsupportedTitle')}</h2>
@@ -665,20 +666,11 @@
     </div>
   </section>
 {:else}
-  <section class="single-panel glass-panel" aria-busy={loadState === 'loading'}>
+  <section class="single-panel glass-panel" aria-busy={loadState === 'loading' || openingGameId !== undefined}>
     <SectionHeader eyebrow={$t('steamGames.eyebrow')} title={$t('steamGames.title')} description={$t('steamGames.description')} />
     {#if loadState === 'loading'}
-      <div class="game-skeleton-list" role="status" aria-live="polite">
+      <div class="game-list-placeholder" role="status" aria-live="polite">
         <span class="sr-only">{$t('steamGames.loading')}</span>
-        {#each [0, 1, 2] as row (row)}
-          <div class="game-skeleton-row" aria-hidden="true">
-            <span class="game-skeleton-copy">
-              <span class:short={row === 1} class="skeleton-line skeleton-game-title"></span>
-              <span class:medium={row === 2} class="skeleton-line skeleton-game-meta"></span>
-            </span>
-            <span class="skeleton-line skeleton-chevron"></span>
-          </div>
-        {/each}
       </div>
     {:else if loadState === 'error'}
       <p class="game-list-status error" role="alert">{$t('steamGames.error')}</p>
@@ -689,7 +681,7 @@
         {#each games as game (game.appId)}
           {@const gameRuntimeLabel = runtimeLabel(game)}
           <li>
-            <button class="game-row" type="button" on:click={() => openGame(game)}>
+            <button class="game-row" type="button" disabled={openingGameId !== undefined} on:click={() => openGame(game)}>
               <span class="game-details">
                 <strong>{game.name}</strong>
                 {#if gameRuntimeLabel}<span class="game-runtime">{gameRuntimeLabel}</span>{/if}
