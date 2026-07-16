@@ -11,32 +11,9 @@
     <FileVersion>0.1.0.0</FileVersion>
     <IsPackable>true</IsPackable>
     <PackageId>GameTweaks.Agent.Abstractions</PackageId>
-    <Title>GameTweaks Agent Abstractions</Title>
-    <Description>Compile-time contracts for integrating BepInEx mods with the shared GameTweaks Agent runtime.</Description>
-    <Authors>NicDev Studios</Authors>
-    <Company>NicDev Studios</Company>
-    <Copyright>Copyright © 2026 NicDev Studios</Copyright>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <PackageProjectUrl>https://github.com/NicDev-Studios/GameTweaks</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/NicDev-Studios/GameTweaks.git</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PackageTags>gametweaks;bepinex;unity;modding;sdk</PackageTags>
-    <PackageReadmeFile>SDK.md</PackageReadmeFile>
-    <IncludeBuildOutput>false</IncludeBuildOutput>
-    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackReferenceAssembly</TargetsForTfmSpecificContentInPackage>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <NuspecFile>GameTweaks.Agent.Abstractions.nuspec</NuspecFile>
+    <NuspecBasePath>$(MSBuildProjectDirectory)</NuspecBasePath>
+    <NuspecProperties>version=$(Version);configuration=$(Configuration)</NuspecProperties>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
-  <ItemGroup>
-    <None Include="../../SDK.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
-  <Target Name="PackReferenceAssembly">
-    <ItemGroup>
-      <TfmSpecificPackageFile Include="$(TargetPath)">
-        <PackagePath>ref/$(TargetFramework)/$(TargetFileName)</PackagePath>
-      </TfmSpecificPackageFile>
-    </ItemGroup>
-  </Target>
 </Project>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>GameTweaks.Agent.Abstractions</id>
+    <version>$version$</version>
+    <title>GameTweaks Agent Abstractions</title>
+    <authors>NicDev Studios</authors>
+    <owners>NicDev Studios</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="expression">MIT</license>
+    <readme>SDK.md</readme>
+    <projectUrl>https://github.com/NicDev-Studios/GameTweaks</projectUrl>
+    <repository type="git" url="https://github.com/NicDev-Studios/GameTweaks.git" />
+    <description>Compile-time contracts for integrating BepInEx mods with the shared GameTweaks Agent runtime.</description>
+    <copyright>Copyright © 2026 NicDev Studios</copyright>
+    <tags>gametweaks bepinex unity modding sdk</tags>
+    <dependencies>
+      <group targetFramework=".NETStandard2.0" />
+    </dependencies>
+    <references>
+      <group targetFramework=".NETStandard2.0">
+        <reference file="GameTweaks.Agent.Abstractions.dll" />
+      </group>
+    </references>
+  </metadata>
+  <files>
+    <file src="bin\$configuration$\netstandard2.0\GameTweaks.Agent.Abstractions.dll" target="ref\netstandard2.0" />
+    <file src="..\..\SDK.md" target="" />
+  </files>
+</package>
