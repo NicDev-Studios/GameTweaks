@@ -3,6 +3,7 @@ $project = Join-Path $PSScriptRoot "src/GameTweaks.Agent.Abstractions/GameTweaks
 $sample = Join-Path $PSScriptRoot "examples/GameTweaks.Agent.Example.Mono/GameTweaks.Agent.Example.Mono.csproj"
 $sampleDirectory = Split-Path -Parent $sample
 $nugetConfig = Join-Path $PSScriptRoot "NuGet.CI.config"
+$nuspec = Join-Path $PSScriptRoot "src/GameTweaks.Agent.Abstractions/GameTweaks.Agent.Abstractions.nuspec"
 $output = Join-Path $PSScriptRoot "artifacts/nuget"
 $packageCache = Join-Path $PSScriptRoot "artifacts/sdk-packages"
 
@@ -12,6 +13,20 @@ foreach ($path in @($output, $packageCache)) {
     }
 }
 New-Item -ItemType Directory -Path $output | Out-Null
+
+[xml]$nuspecDocument = Get-Content -LiteralPath $nuspec -Raw
+$namespace = New-Object System.Xml.XmlNamespaceManager($nuspecDocument.NameTable)
+$namespace.AddNamespace("n", $nuspecDocument.DocumentElement.NamespaceURI)
+if ($nuspecDocument.SelectSingleNode("/n:package/n:metadata/n:references", $namespace)) {
+    throw "A ref-only PackageReference package must not declare legacy nuspec references."
+}
+$referenceFile = $nuspecDocument.SelectSingleNode(
+    "/n:package/n:files/n:file[contains(@target, 'ref\\netstandard2.0')]",
+    $namespace)
+if ($null -eq $referenceFile) {
+    throw "The Agent SDK nuspec must place its assembly under ref/netstandard2.0."
+}
+
 foreach ($directory in @("bin", "obj")) {
     $path = Join-Path $sampleDirectory $directory
     if (Test-Path -LiteralPath $path) {

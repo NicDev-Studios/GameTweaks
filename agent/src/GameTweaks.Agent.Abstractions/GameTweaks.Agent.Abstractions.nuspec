@@ -17,11 +17,6 @@
     <dependencies>
       <group targetFramework=".NETStandard2.0" />
     </dependencies>
-    <references>
-      <group targetFramework=".NETStandard2.0">
-        <reference file="GameTweaks.Agent.Abstractions.dll" />
-      </group>
-    </references>
   </metadata>
   <files>
     <file src="bin\$configuration$\netstandard2.0\GameTweaks.Agent.Abstractions.dll" target="ref\netstandard2.0" />
