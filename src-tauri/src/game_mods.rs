@@ -890,7 +890,7 @@ fn validate_mod_definition(definition: &ModDefinition) -> AppResult<()> {
     if definition.schema_version != 1
         || !valid_identifier(&definition.mod_id)
         || !valid_guid(&definition.guid)
-        || Version::parse(&definition.version).is_err()
+        || !valid_semver(&definition.version)
         || !valid_localized_text(&definition.name)
         || !valid_localized_text(&definition.description)
         || definition.compatibility.architectures.is_empty()
@@ -914,15 +914,18 @@ fn validate_mod_definition(definition: &ModDefinition) -> AppResult<()> {
             "a mod definition contract was invalid",
         ));
     }
-    if definition
-        .compatibility
-        .minimum_agent_version
-        .as_deref()
-        .is_some_and(|version| Version::parse(version).is_err())
-    {
+    let minimum_agent_version_is_valid = match definition.integration {
+        ModIntegration::Agent => definition
+            .compatibility
+            .minimum_agent_version
+            .as_deref()
+            .is_some_and(valid_semver),
+        ModIntegration::ConfigFile => definition.compatibility.minimum_agent_version.is_none(),
+    };
+    if !minimum_agent_version_is_valid {
         return Err(mod_error(
             "catalog_invalid",
-            "a minimum agent version was invalid",
+            "the Agent integration version contract was invalid",
         ));
     }
     let mut field_ids = HashSet::new();
@@ -945,9 +948,7 @@ fn validate_mod_definition(definition: &ModDefinition) -> AppResult<()> {
         field.serialize_value(&field.default_value())?;
     }
     for dependency in &definition.dependencies {
-        if !valid_identifier(&dependency.mod_id)
-            || Version::parse(&dependency.minimum_version).is_err()
-        {
+        if !valid_identifier(&dependency.mod_id) || !valid_semver(&dependency.minimum_version) {
             return Err(mod_error("catalog_invalid", "a mod dependency was invalid"));
         }
     }
@@ -2173,6 +2174,12 @@ fn extract_mod_archive(archive_path: &Path, destination: &Path) -> AppResult<Vec
         })?;
         validate_relative_path(&path)?;
         let normalized = path.to_string_lossy().replace('\\', "/");
+        if !entry.is_dir() && is_reserved_agent_assembly(&normalized) {
+            return Err(mod_error(
+                "mod_integrity_error",
+                "the mod archive contained a shared Agent assembly",
+            ));
+        }
         if !paths.insert(normalized.clone()) {
             return Err(mod_error(
                 "mod_integrity_error",
@@ -2237,6 +2244,11 @@ fn extract_mod_archive(archive_path: &Path, destination: &Path) -> AppResult<Vec
         }
     }
     Ok(files)
+}
+
+fn is_reserved_agent_assembly(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path).to_ascii_lowercase();
+    name.starts_with("gametweaks.agent.") && name.ends_with(".dll")
 }
 
 fn read_config_values(
@@ -2926,6 +2938,10 @@ fn valid_config_name(value: &str) -> bool {
             .any(|character| matches!(character, '\r' | '\n' | '[' | ']' | '='))
 }
 
+fn valid_semver(value: &str) -> bool {
+    value.len() <= 64 && Version::parse(value).is_ok()
+}
+
 fn sha256_hex(raw: &[u8]) -> String {
     format!("{:x}", Sha256::digest(raw))
 }
@@ -3075,6 +3091,24 @@ mod tests {
         let mut definition = definition("author.mod");
         definition.release.repository = "https://example.com/mod".to_owned();
 
+        assert!(validate_mod_definition(&definition).is_err());
+    }
+
+    #[test]
+    fn enforces_the_agent_integration_version_contract() {
+        let mut definition = definition("author.mod");
+        definition.integration = ModIntegration::Agent;
+        assert!(validate_mod_definition(&definition).is_err());
+
+        definition.compatibility.minimum_agent_version = Some("0.1.0".to_owned());
+        assert!(validate_mod_definition(&definition).is_ok());
+
+        definition.compatibility.minimum_agent_version = Some(format!("1.0.0+{}", "a".repeat(59)));
+        assert!(validate_mod_definition(&definition).is_err());
+
+        definition.compatibility.minimum_agent_version = Some("0.1.0".to_owned());
+
+        definition.integration = ModIntegration::ConfigFile;
         assert!(validate_mod_definition(&definition).is_err());
     }
 
@@ -3399,6 +3433,31 @@ mod tests {
         let output = directory.path().join("output");
         fs::create_dir(&output).unwrap();
         assert!(extract_mod_archive(&archive_path, &output).is_err());
+    }
+
+    #[test]
+    fn rejects_shared_agent_assemblies_in_mod_archives() {
+        let directory = tempfile::tempdir().unwrap();
+        let archive_path = directory.path().join("reserved-agent.zip");
+        let file = File::create(&archive_path).unwrap();
+        let mut writer = ZipWriter::new(file);
+        writer
+            .start_file("plugin.dll", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"plugin").unwrap();
+        writer
+            .start_file(
+                "lib\\gAmEtWeAkS.aGeNt.CoRe.DlL",
+                SimpleFileOptions::default(),
+            )
+            .unwrap();
+        writer.write_all(b"agent").unwrap();
+        writer.finish().unwrap();
+        let output = directory.path().join("output");
+        fs::create_dir(&output).unwrap();
+
+        assert!(extract_mod_archive(&archive_path, &output).is_err());
+        assert!(!output.join("plugin.dll").exists());
     }
 
     #[test]

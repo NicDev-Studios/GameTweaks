@@ -105,6 +105,10 @@ jobs:
       - name: Test Agent core and SDK
         run: dotnet test agent/tests/GameTweaks.Agent.Core.Tests/GameTweaks.Agent.Core.Tests.csproj --configuration Release
 
+      - name: Pack and smoke-test Agent SDK
+        shell: pwsh
+        run: ./agent/pack-sdk.ps1
+
       - name: Build bundled Agent hosts
         shell: pwsh
         run: ./agent/build-release.ps1

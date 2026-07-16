@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace GameTweaks.Agent.Abstractions;
 
 public enum SettingKind
@@ -131,6 +133,38 @@ public sealed class DelegateSettingBinding<T> : IDeferredSettingBinding
             return true;
         }
 
+        if (typeof(T) == typeof(long) && value is int integer)
+        {
+            converted = (T)(object)(long)integer;
+            return true;
+        }
+        if (typeof(T) == typeof(int) && value is long longInteger &&
+            longInteger is >= int.MinValue and <= int.MaxValue)
+        {
+            converted = (T)(object)(int)longInteger;
+            return true;
+        }
+        if (typeof(T) == typeof(float) && value is double floating &&
+            !double.IsNaN(floating) && !double.IsInfinity(floating) &&
+            floating is >= -float.MaxValue and <= float.MaxValue)
+        {
+            converted = (T)(object)(float)floating;
+            return true;
+        }
+        if (typeof(T) == typeof(decimal) && value is double decimalValue &&
+            !double.IsNaN(decimalValue) && !double.IsInfinity(decimalValue))
+        {
+            try
+            {
+                converted = (T)(object)(decimal)decimalValue;
+                return true;
+            }
+            catch (OverflowException)
+            {
+                // The wire value cannot be represented by the requested binding type.
+            }
+        }
+
         converted = default;
         return false;
     }
@@ -139,9 +173,39 @@ public sealed class DelegateSettingBinding<T> : IDeferredSettingBinding
 public static class GameTweaksApi
 {
     private static readonly object Gate = new();
+    private static readonly Queue<AvailabilityNotification> AvailabilityNotifications = new();
     private static IGameTweaksAgent? _agent;
+    private static Action<IGameTweaksAgent>? _available;
+    private static bool _dispatchingAvailability;
 
-    public static event Action<IGameTweaksAgent>? Available;
+    public static event Action<IGameTweaksAgent>? Available
+    {
+        add
+        {
+            if (value is null)
+                return;
+
+            var dispatch = false;
+            lock (Gate)
+            {
+                _available += value;
+                var agent = _agent;
+                if (agent is not null)
+                    AvailabilityNotifications.Enqueue(new(value, agent));
+                dispatch = TryBeginAvailabilityDispatch();
+            }
+
+            if (dispatch)
+                DispatchAvailability();
+        }
+        remove
+        {
+            if (value is null)
+                return;
+            lock (Gate)
+                _available -= value;
+        }
+    }
 
     public static bool TryGetAgent(out IGameTweaksAgent? agent)
     {
@@ -162,13 +226,22 @@ public static class GameTweaksApi
         }
     }
 
-    public static void Attach(IGameTweaksAgent agent)
+    internal static void Attach(IGameTweaksAgent agent)
     {
         if (agent is null)
             throw new ArgumentNullException(nameof(agent));
+        var dispatch = false;
         lock (Gate)
+        {
             _agent = agent;
-        Available?.Invoke(agent);
+            foreach (var subscriber in _available?.GetInvocationList() ?? Array.Empty<Delegate>())
+                AvailabilityNotifications.Enqueue(new(
+                    (Action<IGameTweaksAgent>)subscriber,
+                    agent));
+            dispatch = TryBeginAvailabilityDispatch();
+        }
+        if (dispatch)
+            DispatchAvailability();
     }
 
     internal static void Detach(IGameTweaksAgent agent)
@@ -181,4 +254,58 @@ public static class GameTweaksApi
                 _agent = null;
         }
     }
+
+    private static void NotifySubscriber(
+        Action<IGameTweaksAgent> subscriber,
+        IGameTweaksAgent agent)
+    {
+        try
+        {
+            subscriber(agent);
+        }
+        catch (Exception error)
+        {
+            try
+            {
+                Trace.TraceWarning(
+                    "GameTweaks Agent availability callback failed ({0}): {1}",
+                    error.GetType().Name,
+                    error.Message);
+            }
+            catch (Exception)
+            {
+                // A process-wide custom trace listener must not stop Agent delivery.
+            }
+        }
+    }
+
+    private static bool TryBeginAvailabilityDispatch()
+    {
+        if (_dispatchingAvailability || AvailabilityNotifications.Count == 0)
+            return false;
+        _dispatchingAvailability = true;
+        return true;
+    }
+
+    private static void DispatchAvailability()
+    {
+        while (true)
+        {
+            AvailabilityNotification notification;
+            lock (Gate)
+            {
+                if (AvailabilityNotifications.Count == 0)
+                {
+                    _dispatchingAvailability = false;
+                    return;
+                }
+                notification = AvailabilityNotifications.Dequeue();
+            }
+            NotifySubscriber(notification.Subscriber, notification.Agent);
+        }
+    }
+
+    private sealed record AvailabilityNotification(
+        Action<IGameTweaksAgent> Subscriber,
+        IGameTweaksAgent Agent);
 }

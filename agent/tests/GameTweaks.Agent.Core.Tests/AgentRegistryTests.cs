@@ -92,6 +92,42 @@ public sealed class AgentRegistryTests
         Assert.Equal("deferred_write_unsupported", result.ErrorCode);
     }
 
+    [Fact]
+    public void DelegateBindingsConvertValidatedWireNumbers()
+    {
+        long integer = 0;
+        float floating = 0;
+        decimal decimalValue = 0;
+        var integerBinding = new DelegateSettingBinding<long>(
+            () => integer,
+            value =>
+            {
+                integer = value;
+                return SettingChangeResult.Success();
+            });
+        var floatingBinding = new DelegateSettingBinding<float>(
+            () => floating,
+            value =>
+            {
+                floating = value;
+                return SettingChangeResult.Success();
+            });
+        var decimalBinding = new DelegateSettingBinding<decimal>(
+            () => decimalValue,
+            value =>
+            {
+                decimalValue = value;
+                return SettingChangeResult.Success();
+            });
+
+        Assert.True(integerBinding.SetValue(42).Accepted);
+        Assert.True(floatingBinding.SetValue(0.5d).Accepted);
+        Assert.True(decimalBinding.SetValue(1.25d).Accepted);
+        Assert.Equal(42, integer);
+        Assert.Equal(0.5f, floating);
+        Assert.Equal(1.25m, decimalValue);
+    }
+
     private sealed class TestBinding(object? value) : ISettingBinding
     {
         private object? _value = value;

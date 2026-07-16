@@ -16,6 +16,8 @@ agent/artifacts/mono/**
 !agent/artifacts/mono/README.txt
 agent/artifacts/il2cpp/**
 !agent/artifacts/il2cpp/README.txt
+agent/artifacts/nuget/
+agent/artifacts/sdk-packages/
 
 .DS_Store
 *.log

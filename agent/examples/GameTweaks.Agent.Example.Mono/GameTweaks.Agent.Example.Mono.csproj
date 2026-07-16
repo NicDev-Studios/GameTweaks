@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <AssemblyName>Example.Accessibility</AssemblyName>
+    <RootNamespace>Example.Accessibility</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BepInEx.BaseLib" Version="5.4.21">
+      <IncludeAssets>compile</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="GameTweaks.Agent.Abstractions" Version="0.1.0">
+      <IncludeAssets>compile</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <ProjectReference Include="../../src/UnityEngine.Reference/UnityEngine.Reference.csproj" Private="false" />
+  </ItemGroup>
+</Project>

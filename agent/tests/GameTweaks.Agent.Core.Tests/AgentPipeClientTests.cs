@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO.Pipes;
+using System.Reflection;
 using System.Text.Json;
 using GameTweaks.Agent.Abstractions;
 using GameTweaks.Agent.Core;
@@ -91,10 +92,22 @@ public sealed class AgentPipeClientTests
         }));
         IDisposable? first = null;
         IDisposable? second = null;
+        var beforeAttachCalls = 0;
+        var afterAttachCalls = 0;
+        Action<IGameTweaksAgent> throwingSubscriber = _ =>
+            throw new InvalidOperationException("Test subscriber failure.");
+        Action<IGameTweaksAgent> beforeAttachSubscriber = _ => beforeAttachCalls++;
+        Action<IGameTweaksAgent> afterAttachSubscriber = _ => afterAttachCalls++;
         try
         {
+            GameTweaksApi.Available += throwingSubscriber;
+            GameTweaksApi.Available += beforeAttachSubscriber;
             first = AgentBootstrap.Start(markerPath, "mono");
             Assert.True(GameTweaksApi.TryGetAgent(out var firstRegistry));
+            Assert.Equal(1, beforeAttachCalls);
+
+            GameTweaksApi.Available += afterAttachSubscriber;
+            Assert.Equal(1, afterAttachCalls);
 
             await Task.Run(first.Dispose);
             first.Dispose();
@@ -104,6 +117,8 @@ public sealed class AgentPipeClientTests
             Assert.NotSame(first, second);
             Assert.True(GameTweaksApi.TryGetAgent(out var secondRegistry));
             Assert.NotSame(firstRegistry, secondRegistry);
+            Assert.Equal(2, beforeAttachCalls);
+            Assert.Equal(2, afterAttachCalls);
 
             await Task.Run(second.Dispose);
             second.Dispose();
@@ -111,9 +126,64 @@ public sealed class AgentPipeClientTests
         }
         finally
         {
+            GameTweaksApi.Available -= afterAttachSubscriber;
+            GameTweaksApi.Available -= beforeAttachSubscriber;
+            GameTweaksApi.Available -= throwingSubscriber;
             second?.Dispose();
             first?.Dispose();
             File.Delete(markerPath);
+        }
+    }
+
+    [Fact]
+    public void RuntimeAttachmentIsNotPartOfThePublicSdk()
+    {
+        Assert.Null(typeof(GameTweaksApi).GetMethod(
+            "Attach",
+            BindingFlags.Public | BindingFlags.Static));
+        Assert.NotNull(typeof(GameTweaksApi).GetMethod(
+            "Attach",
+            BindingFlags.NonPublic | BindingFlags.Static));
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task AvailabilityRemainsOrderedWhenTheAgentIsReplaced()
+    {
+        var first = new TestAgent();
+        var second = new TestAgent();
+        using var firstCallbackStarted = new ManualResetEventSlim();
+        using var releaseFirstCallback = new ManualResetEventSlim();
+        var received = new List<IGameTweaksAgent>();
+        Action<IGameTweaksAgent> subscriber = agent =>
+        {
+            if (ReferenceEquals(agent, first))
+            {
+                firstCallbackStarted.Set();
+                releaseFirstCallback.Wait(TimeSpan.FromSeconds(5));
+            }
+            lock (received)
+                received.Add(agent);
+        };
+
+        InvokeApiMethod("Attach", first);
+        var subscribe = Task.Run(() => GameTweaksApi.Available += subscriber);
+        try
+        {
+            Assert.True(firstCallbackStarted.Wait(TimeSpan.FromSeconds(5)));
+            await Task.Run(() => InvokeApiMethod("Attach", second));
+            releaseFirstCallback.Set();
+            await subscribe;
+
+            lock (received)
+                Assert.Equal(new IGameTweaksAgent[] { first, second }, received);
+        }
+        finally
+        {
+            releaseFirstCallback.Set();
+            await subscribe;
+            GameTweaksApi.Available -= subscriber;
+            InvokeApiMethod("Detach", second);
+            InvokeApiMethod("Detach", first);
         }
     }
 
@@ -239,6 +309,33 @@ public sealed class AgentPipeClientTests
             protocolVersion = 1,
             accepted = true
         });
+    }
+
+    private static void InvokeApiMethod(string name, IGameTweaksAgent agent)
+    {
+        var method = typeof(GameTweaksApi).GetMethod(
+            name,
+            BindingFlags.NonPublic | BindingFlags.Static) ??
+            throw new InvalidOperationException($"GameTweaksApi.{name} was missing.");
+        method.Invoke(null, new object[] { agent });
+    }
+
+    private sealed class TestAgent : IGameTweaksAgent
+    {
+        public void RegisterMod(ModRegistration mod)
+        {
+        }
+
+        public void RegisterSetting(
+            string modId,
+            SettingMetadata metadata,
+            ISettingBinding binding)
+        {
+        }
+
+        public void UnregisterMod(string modId)
+        {
+        }
     }
 
     private sealed class ThrowingSetterBinding : ISettingBinding

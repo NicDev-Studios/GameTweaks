@@ -22,7 +22,8 @@ Named Pipe protocol documented in `PROTOCOL.md`.
 
 Projects:
 
-- `GameTweaks.Agent.Abstractions`: dependency-free SDK contract for mod authors.
+- `GameTweaks.Agent.Abstractions`: dependency-free SDK contract published on
+  NuGet for mod authors.
 - `GameTweaks.Agent.Core`: registry, validation, reconnect and Named Pipe protocol.
 - `GameTweaks.Agent.Mono`: thin BepInEx 5 Unity Mono host.
 - `GameTweaks.Agent.IL2CPP`: thin BepInEx 6 Unity IL2CPP host.
@@ -63,25 +64,22 @@ but GameTweaks does not install, update, uninstall, or mark them Official.
 
 ## Mod SDK usage
 
-Register after `GameTweaksApi.Available` fires (or immediately when
-`TryGetAgent` succeeds). A BepInEx `ConfigEntry<T>` can be exposed with the
-dependency-free delegate binding:
+Install `GameTweaks.Agent.Abstractions` from NuGet and follow the complete
+[SDK guide](SDK.md). The guide covers the required hard BepInEx dependency,
+lifecycle-safe registration, supported value types, deferred settings, catalog
+matching, and release packaging. A buildable BepInEx 5 Mono plugin is available
+under [`examples/GameTweaks.Agent.Example.Mono`](examples/GameTweaks.Agent.Example.Mono).
 
-```csharp
-agent.RegisterMod(new(
-    "example.accessibility", "1.0.0",
-    new("Accessibility"), new("Accessibility controls")));
+## Publish the SDK
 
-agent.RegisterSetting("example.accessibility", new(
-    "highContrast", "Accessibility", "HighContrast", new("High contrast"),
-    SettingKind.Boolean, configEntry.DefaultValue, SettingApplyMode.Live,
-    SettingDisplay.Switch),
-    new DelegateSettingBinding<bool>(
-        () => configEntry.Value,
-        value => { configEntry.Value = value; return SettingChangeResult.Success(); }));
-```
+NuGet publication uses Trusted Publishing from `.github/workflows/release.yml`;
+no long-lived API key is stored. Configure the repository secret `NUGET_USER`
+with the individual nuget.org profile name that manages the policy. The policy's
+workflow filename is `release.yml` and its environment remains empty.
 
-For `RestartRequired` and `NextLaunch`, provide the binding's optional `store`
-callback. The Agent deliberately rejects a deferred change when the binding
-cannot persist it without applying it to the current session. Call
-`NotifyValueChanged()` when the mod changes a live value itself.
+Update all Agent version constants together, then push the dedicated tag
+`agent-sdk-v<package-version>`. For example, `agent-sdk-v0.1.0` publishes
+package version `0.1.0`. The release job rejects a tag that differs from the
+package, host, Core, or desktop Agent version, runs the tests, verifies the
+compile-only package and example output, and only then requests a temporary
+NuGet credential.

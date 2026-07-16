@@ -5,6 +5,30 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-  </PropertyGroup>
-</Project>
 
+    <Version>0.1.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <IsPackable>true</IsPackable>
+    <PackageId>GameTweaks.Agent.Abstractions</PackageId>
+    <Title>GameTweaks Agent Abstractions</Title>
+    <Description>Compile-time contracts for integrating BepInEx mods with the shared GameTweaks Agent runtime.</Description>
+    <Authors>NicDev Studios</Authors>
+    <Company>NicDev Studios</Company>
+    <Copyright>Copyright © 2026 NicDev Studios</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageProjectUrl>https://github.com/NicDev-Studios/GameTweaks</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/NicDev-Studios/GameTweaks.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>gametweaks;bepinex;unity;modding;sdk</PackageTags>
+    <PackageReadmeFile>SDK.md</PackageReadmeFile>
+    <BuildOutputTargetFolder>ref</BuildOutputTargetFolder>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../SDK.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
