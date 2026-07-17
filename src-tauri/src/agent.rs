@@ -119,7 +119,11 @@ enum IncomingFrame {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "type"
+)]
 enum OutgoingFrame {
     #[cfg(windows)]
     Challenge {
@@ -1281,6 +1285,15 @@ mod tests {
         let mut raw = Vec::new();
         write_frame(&mut raw, &frame).unwrap();
         assert!(raw.len() > 4);
+
+        let payload: Value = serde_json::from_slice(&raw[4..]).unwrap();
+        assert_eq!(payload["type"], "setConfig");
+        assert_eq!(payload["protocolVersion"], 1);
+        assert_eq!(payload["requestId"], "request");
+        assert_eq!(payload["modId"], "example.mod");
+        assert!(payload.get("protocol_version").is_none());
+        assert!(payload.get("request_id").is_none());
+        assert!(payload.get("mod_id").is_none());
     }
 
     #[test]
