@@ -18,6 +18,7 @@ use sha2::Sha256;
 #[cfg(windows)]
 use tauri::Emitter;
 use tauri::{AppHandle, Manager};
+#[cfg(windows)]
 use tempfile::Builder as TempBuilder;
 use tokio::sync::oneshot;
 
