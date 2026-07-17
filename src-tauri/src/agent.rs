@@ -901,6 +901,7 @@ fn read_snapshot_cache(app: &AppHandle, app_id: u32) -> Option<Vec<AgentModSnaps
     .then_some(cache.mods)
 }
 
+#[cfg(windows)]
 fn persist_snapshot_cache(
     app: &AppHandle,
     app_id: u32,

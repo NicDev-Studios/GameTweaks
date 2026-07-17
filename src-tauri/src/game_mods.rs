@@ -2024,15 +2024,20 @@ fn validate_install_set(
                     && marker.mod_id == *mod_id
                     && definitions
                         .get(mod_id)
-                        .is_some_and(|definition| marker.guid == definition.guid) =>
+                        .is_some_and(|definition| marker.guid == definition.guid)
+                    && !replace_existing.contains(mod_id) =>
             {
-                if !replace_existing.contains(mod_id) {
-                    return Err(mod_error(
-                        "mod_collision",
-                        "an existing mod was not replaceable",
-                    ));
-                }
+                return Err(mod_error(
+                    "mod_collision",
+                    "an existing mod was not replaceable",
+                ));
             }
+            Some(marker)
+                if marker.app_id == app_id
+                    && marker.mod_id == *mod_id
+                    && definitions
+                        .get(mod_id)
+                        .is_some_and(|definition| marker.guid == definition.guid) => {}
             Some(_) => {
                 return Err(mod_error(
                     "mod_collision",
