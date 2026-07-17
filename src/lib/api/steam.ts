@@ -108,6 +108,7 @@ export interface GameSupport {
   name?: LocalizedText;
   mods: GameMod[];
   agentInstalled: boolean;
+  agentVersion?: string;
   agentStatus: AgentConnectionStatus;
   cached: boolean;
 }

@@ -550,6 +550,7 @@ pub struct GameSupport {
     pub name: Option<LocalizedText>,
     pub mods: Vec<GameMod>,
     pub agent_installed: bool,
+    pub agent_version: Option<String>,
     pub agent_status: AgentConnectionStatus,
     pub cached: bool,
 }
@@ -677,6 +678,9 @@ pub async fn get_support(app: &AppHandle, state: &AppState, app_id: u32) -> AppR
     let agent_installed = target
         .as_ref()
         .is_some_and(|target| agent::agent_is_installed(target, app_id));
+    let agent_version = target
+        .as_ref()
+        .and_then(|target| agent::installed_agent_version(target, app_id));
     match load_catalog(app, state, app_id).await {
         Ok((catalog, definitions, cached)) => {
             let mods = definitions
@@ -691,7 +695,7 @@ pub async fn get_support(app: &AppHandle, state: &AppState, app_id: u32) -> AppR
                     .to_lowercase()
                     .cmp(&right.name.en.to_lowercase())
             });
-            mods.extend(agent::external_mods(state, app_id).await);
+            mods.extend(agent::external_mods(app, state, app_id).await);
             apply_restart_flags(state, app_id, &mut mods).await;
             Ok(GameSupport {
                 app_id,
@@ -699,25 +703,30 @@ pub async fn get_support(app: &AppHandle, state: &AppState, app_id: u32) -> AppR
                 name: Some(catalog.name),
                 mods,
                 agent_installed,
+                agent_version,
                 agent_status: agent::connection_status(state, app_id).await,
                 cached,
             })
         }
         Err(error) if error.code == "game_not_supported" => {
             support_without_catalog(
+                app,
                 state,
                 app_id,
                 GameSupportStatus::Unsupported,
                 agent_installed,
+                agent_version,
             )
             .await
         }
         Err(_) => {
             support_without_catalog(
+                app,
                 state,
                 app_id,
                 GameSupportStatus::Unavailable,
                 agent_installed,
+                agent_version,
             )
             .await
         }
@@ -725,12 +734,14 @@ pub async fn get_support(app: &AppHandle, state: &AppState, app_id: u32) -> AppR
 }
 
 async fn support_without_catalog(
+    app: &AppHandle,
     state: &AppState,
     app_id: u32,
     status: GameSupportStatus,
     agent_installed: bool,
+    agent_version: Option<String>,
 ) -> AppResult<GameSupport> {
-    let mut mods = agent::external_mods(state, app_id).await;
+    let mut mods = agent::external_mods(app, state, app_id).await;
     apply_restart_flags(state, app_id, &mut mods).await;
     Ok(GameSupport {
         app_id,
@@ -738,6 +749,7 @@ async fn support_without_catalog(
         name: None,
         mods,
         agent_installed,
+        agent_version,
         agent_status: agent::connection_status(state, app_id).await,
         cached: false,
     })

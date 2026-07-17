@@ -36,7 +36,8 @@
       "installedConnecting": "Agent installed · connecting",
       "connected": "Agent connected",
       "installedIncompatible": "Agent installed · incompatible",
-      "installedAmbiguous": "Agent installed · multiple instances"
+      "installedAmbiguous": "Agent installed · multiple instances",
+      "version": "Agent v{version}"
     },
     "developerAgent": {
       "install": "Install dev agent",
@@ -52,7 +53,7 @@
       "official": "Official",
       "community": "Community",
       "external": "External",
-      "externalNote": "Managed by the running mod",
+      "externalNote": "Installed externally · settings are available while the game is connected",
       "blocked": "Installation blocked",
       "working": "Mod action in progress",
       "dependencies": "Requires",

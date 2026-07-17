@@ -208,7 +208,14 @@
   min-width: 8.5rem;
   min-height: 2rem;
   place-items: center end;
+  gap: 0.3rem;
   flex: 0 0 auto;
+}
+
+.agent-version {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .detail-heading p,

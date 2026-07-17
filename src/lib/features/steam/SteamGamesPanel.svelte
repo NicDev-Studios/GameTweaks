@@ -469,6 +469,11 @@
           >
             {agentStatusLabel(support)}
           </span>
+          {#if support.agentVersion}
+            <span class="agent-version">
+              {$t('steamGames.agent.version', { version: support.agentVersion })}
+            </span>
+          {/if}
         {/if}
       </span>
     </div>

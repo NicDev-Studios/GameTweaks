@@ -18,7 +18,6 @@ use sha2::Sha256;
 #[cfg(windows)]
 use tauri::Emitter;
 use tauri::{AppHandle, Manager};
-#[cfg(windows)]
 use tempfile::Builder as TempBuilder;
 use tokio::sync::oneshot;
 
@@ -37,6 +36,8 @@ use crate::steam::discover_installed_games;
 
 const PROTOCOL_VERSION: u32 = 1;
 const AGENT_VERSION: &str = "0.1.0";
+const SNAPSHOT_CACHE_SCHEMA_VERSION: u32 = 1;
+const MAXIMUM_SNAPSHOT_CACHE_BYTES: u64 = 1024 * 1024;
 #[cfg(windows)]
 const PIPE_NAME: &str = r"\\.\pipe\GameTweaks.Agent.v1";
 #[cfg(any(windows, test))]
@@ -81,10 +82,22 @@ struct AgentModSnapshot {
     values: HashMap<String, Value>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AgentSnapshotCache {
+    schema_version: u32,
+    app_id: u32,
+    mods: Vec<AgentModSnapshot>,
+}
+
 #[cfg(any(windows, test))]
 #[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase", tag = "type")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "type"
+)]
 enum IncomingFrame {
     Hello {
         protocol_version: u32,
@@ -190,16 +203,18 @@ pub async fn is_connected(state: &AppState, app_id: u32) -> bool {
     connection_status(state, app_id).await == AgentConnectionStatus::Connected
 }
 
-pub async fn external_mods(state: &AppState, app_id: u32) -> Vec<GameMod> {
-    let agent = state.agent.lock().await;
-    let Some(connections) = agent.connections.get(&app_id) else {
-        return Vec::new();
+pub async fn external_mods(app: &AppHandle, state: &AppState, app_id: u32) -> Vec<GameMod> {
+    let live = {
+        let agent = state.agent.lock().await;
+        agent
+            .connections
+            .get(&app_id)
+            .filter(|connections| connections.len() == 1)
+            .and_then(|connections| connections.first())
+            .map(|connection| connection.mods.clone())
     };
-    if connections.len() != 1 {
-        return Vec::new();
-    }
-    connections[0]
-        .mods
+    live.or_else(|| read_snapshot_cache(app, app_id))
+        .unwrap_or_default()
         .iter()
         .map(snapshot_to_external_mod)
         .collect()
@@ -382,6 +397,12 @@ pub(crate) fn agent_is_current(target: &InstallTarget, app_id: u32) -> bool {
 
 pub(crate) fn agent_is_installed(target: &InstallTarget, app_id: u32) -> bool {
     valid_agent_install(target).is_some_and(|marker| marker.app_id == app_id)
+}
+
+pub(crate) fn installed_agent_version(target: &InstallTarget, app_id: u32) -> Option<String> {
+    valid_agent_install(target)
+        .filter(|marker| marker.app_id == app_id)
+        .map(|marker| marker.version)
 }
 
 pub(crate) fn bundled_agent_meets(minimum: Option<&str>) -> bool {
@@ -842,7 +863,6 @@ fn read_frame(reader: &mut impl Read) -> std::io::Result<IncomingFrame> {
     serde_json::from_slice(&raw).map_err(std::io::Error::other)
 }
 
-#[cfg(any(windows, test))]
 fn valid_snapshot(snapshot: &AgentModSnapshot) -> bool {
     !snapshot.mod_id.is_empty()
         && snapshot.mod_id.len() <= 96
@@ -855,6 +875,60 @@ fn valid_snapshot(snapshot: &AgentModSnapshot) -> bool {
         && snapshot.fields.len() <= 512
         && snapshot.values.len() <= 512
         && snapshot.fields.iter().all(ConfigField::valid_for_agent)
+}
+
+fn snapshot_cache_path(app: &AppHandle, app_id: u32) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|root| root.join("agent-snapshots").join(format!("{app_id}.json")))
+}
+
+fn read_snapshot_cache(app: &AppHandle, app_id: u32) -> Option<Vec<AgentModSnapshot>> {
+    let path = snapshot_cache_path(app, app_id)?;
+    let metadata = fs::symlink_metadata(&path).ok()?;
+    if !metadata.is_file()
+        || metadata.file_type().is_symlink()
+        || metadata.len() > MAXIMUM_SNAPSHOT_CACHE_BYTES
+    {
+        return None;
+    }
+    let cache: AgentSnapshotCache = serde_json::from_slice(&fs::read(path).ok()?).ok()?;
+    (cache.schema_version == SNAPSHOT_CACHE_SCHEMA_VERSION
+        && cache.app_id == app_id
+        && cache.mods.len() <= 256
+        && cache.mods.iter().all(valid_snapshot))
+    .then_some(cache.mods)
+}
+
+fn persist_snapshot_cache(
+    app: &AppHandle,
+    app_id: u32,
+    mods: &[AgentModSnapshot],
+) -> std::io::Result<()> {
+    let path = snapshot_cache_path(app, app_id)
+        .ok_or_else(|| std::io::Error::other("Agent snapshot cache location unavailable"))?;
+    let root = path
+        .parent()
+        .ok_or_else(|| std::io::Error::other("Agent snapshot cache parent unavailable"))?;
+    fs::create_dir_all(root)?;
+    let mut temporary = TempBuilder::new()
+        .prefix(".agent-snapshot-")
+        .tempfile_in(root)?;
+    serde_json::to_writer(
+        &mut temporary,
+        &AgentSnapshotCache {
+            schema_version: SNAPSHOT_CACHE_SCHEMA_VERSION,
+            app_id,
+            mods: mods.to_vec(),
+        },
+    )
+    .map_err(std::io::Error::other)?;
+    temporary.write_all(b"\n")?;
+    temporary
+        .persist(path)
+        .map_err(|error| error.error)
+        .map(|_| ())
 }
 
 #[cfg(windows)]
@@ -872,6 +946,9 @@ fn handle_incoming(app: &AppHandle, app_id: u32, instance_id: &str, frame: Incom
             && mods.len() <= 256
             && mods.iter().all(valid_snapshot) =>
         {
+            if let Err(error) = persist_snapshot_cache(app, app_id, &mods) {
+                tracing::warn!(%error, app_id, "failed to persist the Agent mod snapshot");
+            }
             let mut agent = state.agent.blocking_lock();
             if let Some(connection) = agent.connections.get_mut(&app_id).and_then(|connections| {
                 connections
@@ -899,26 +976,31 @@ fn handle_incoming(app: &AppHandle, app_id: u32, instance_id: &str, frame: Incom
             && values.len() <= 128 =>
         {
             let mut agent = state.agent.blocking_lock();
-            if let Some(snapshot) = agent
-                .connections
-                .get_mut(&app_id)
-                .and_then(|connections| {
+            let cached_mods = if let Some(connection) =
+                agent.connections.get_mut(&app_id).and_then(|connections| {
                     connections
                         .iter_mut()
                         .find(|connection| connection.instance_id == instance_id)
-                })
-                .and_then(|connection| {
-                    connection
-                        .mods
-                        .iter_mut()
-                        .find(|snapshot| snapshot.mod_id == mod_id)
-                })
-            {
-                for (id, value) in &values {
-                    snapshot.values.insert(id.clone(), value.clone());
+                }) {
+                if let Some(snapshot) = connection
+                    .mods
+                    .iter_mut()
+                    .find(|snapshot| snapshot.mod_id == mod_id)
+                {
+                    for (id, value) in &values {
+                        snapshot.values.insert(id.clone(), value.clone());
+                    }
+                }
+                Some(connection.mods.clone())
+            } else {
+                None
+            };
+            drop(agent);
+            if let Some(mods) = cached_mods {
+                if let Err(error) = persist_snapshot_cache(app, app_id, &mods) {
+                    tracing::warn!(%error, app_id, "failed to persist the Agent mod snapshot");
                 }
             }
-            drop(agent);
             let _ = app.emit(
                 AGENT_CONFIG_EVENT,
                 serde_json::json!({ "appId": app_id, "modId": mod_id, "values": values }),
@@ -1250,7 +1332,12 @@ mod tests {
 
         assert!(agent_is_installed(&target, 2709570));
         assert!(!agent_is_current(&target, 2709570));
+        assert_eq!(
+            installed_agent_version(&target, 2709570).as_deref(),
+            Some("0.0.9")
+        );
         assert!(!agent_is_installed(&target, 10));
+        assert_eq!(installed_agent_version(&target, 10), None);
     }
 
     #[test]
@@ -1294,6 +1381,34 @@ mod tests {
         assert!(payload.get("protocol_version").is_none());
         assert!(payload.get("request_id").is_none());
         assert!(payload.get("mod_id").is_none());
+    }
+
+    #[test]
+    fn agent_hello_uses_camel_case_fields() {
+        let raw = br#"{
+            "type":"hello",
+            "protocolVersion":1,
+            "appId":2709570,
+            "processId":42,
+            "instanceId":"instance",
+            "runtime":"mono",
+            "agentVersion":"0.1.0",
+            "proof":"proof"
+        }"#;
+
+        let frame: IncomingFrame = serde_json::from_slice(raw).unwrap();
+        assert!(matches!(
+            frame,
+            IncomingFrame::Hello {
+                protocol_version: 1,
+                app_id: 2_709_570,
+                process_id: 42,
+                ref instance_id,
+                runtime: BepInExRuntime::Mono,
+                ref agent_version,
+                ref proof,
+            } if instance_id == "instance" && agent_version == "0.1.0" && proof == "proof"
+        ));
     }
 
     #[test]

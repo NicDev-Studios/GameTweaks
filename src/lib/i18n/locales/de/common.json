@@ -36,7 +36,8 @@
       "installedConnecting": "Agent installiert · verbindet",
       "connected": "Agent verbunden",
       "installedIncompatible": "Agent installiert · inkompatibel",
-      "installedAmbiguous": "Agent installiert · mehrere Instanzen"
+      "installedAmbiguous": "Agent installiert · mehrere Instanzen",
+      "version": "Agent v{version}"
     },
     "developerAgent": {
       "install": "Dev-Agent installieren",
@@ -52,7 +53,7 @@
       "official": "Official",
       "community": "Community",
       "external": "External",
-      "externalNote": "Wird vom laufenden Mod verwaltet",
+      "externalNote": "Extern installiert · Einstellungen sind bei verbundenem Spiel verfügbar",
       "blocked": "Installation gesperrt",
       "working": "Mod-Aktion läuft",
       "dependencies": "Benötigt",
