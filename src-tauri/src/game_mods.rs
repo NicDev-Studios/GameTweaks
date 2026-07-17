@@ -60,7 +60,11 @@ pub enum ConfigApplyMode {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", tag = "control")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "control"
+)]
 pub enum ConfigField {
     Boolean {
         id: String,

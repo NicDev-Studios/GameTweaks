@@ -59,6 +59,7 @@
   let drafts: Record<string, Record<string, unknown>> = {};
   let dirtyMods = new Set<string>();
   let modProgress: Record<string, ModInstallProgress> = {};
+  const configSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   onMount(() => {
     void refreshGames();
@@ -91,6 +92,8 @@
       });
     return () => {
       disposed = true;
+      for (const timer of configSaveTimers.values()) clearTimeout(timer);
+      configSaveTimers.clear();
       stopListening?.();
       stopModProgress?.();
     };
@@ -362,6 +365,20 @@
       [modId]: { ...(drafts[modId] ?? {}), [fieldId]: value }
     };
     dirtyMods = new Set([...dirtyMods, modId]);
+    scheduleConfigSave(modId, fieldId, value);
+  }
+
+  function scheduleConfigSave(modId: string, fieldId: string, value: unknown) {
+    const key = `${modId}\0${fieldId}`;
+    const previous = configSaveTimers.get(key);
+    if (previous) clearTimeout(previous);
+    configSaveTimers.set(
+      key,
+      setTimeout(() => {
+        configSaveTimers.delete(key);
+        void saveConfigValue(modId, fieldId, value);
+      }, 200)
+    );
   }
 
   function toggleMulti(modId: string, fieldId: string, option: string, checked: boolean) {
@@ -375,17 +392,24 @@
     );
   }
 
-  async function saveConfig(mod: GameMod) {
+  async function saveConfigValue(modId: string, fieldId: string, value: unknown) {
     if (!selectedGame) return;
-    busyModId = mod.modId;
-    clearModError(mod.modId);
+    const appId = selectedGame.appId;
+    clearModError(modId);
     try {
-      support = await setModConfig(selectedGame.appId, mod.modId, drafts[mod.modId] ?? {});
-      resetModDraft(mod.modId);
+      const next = await setModConfig(appId, modId, { [fieldId]: value });
+      if (selectedGame?.appId !== appId) return;
+      support = next;
+      if (drafts[modId]?.[fieldId] === value) {
+        const savedMod = next.mods.find((candidate) => candidate.modId === modId);
+        drafts = {
+          ...drafts,
+          [modId]: { ...(drafts[modId] ?? {}), ...(savedMod?.values ?? {}), [fieldId]: value }
+        };
+        dirtyMods = new Set([...dirtyMods].filter((candidate) => candidate !== modId));
+      }
     } catch (error) {
-      modErrors = { ...modErrors, [mod.modId]: errorMessage(error) };
-    } finally {
-      busyModId = undefined;
+      modErrors = { ...modErrors, [modId]: errorMessage(error) };
     }
   }
 
@@ -674,14 +698,6 @@
                       {/if}
                     </div>
                   {/each}
-                  <div class="config-actions">
-                    <button class="secondary-action" type="button" disabled={!dirtyMods.has(mod.modId) || actionBusy || busyModId !== undefined} on:click={() => resetModDraft(mod.modId)}>
-                      {$t('steamGames.mods.reset')}
-                    </button>
-                    <button class="primary-action" type="button" disabled={!dirtyMods.has(mod.modId) || actionBusy || busyModId !== undefined} on:click={() => saveConfig(mod)}>
-                      {$t('steamGames.mods.save')}
-                    </button>
-                  </div>
                 </div>
               {/if}
               </article>

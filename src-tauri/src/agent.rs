@@ -43,6 +43,7 @@ const MAXIMUM_SNAPSHOT_CACHE_BYTES: u64 = 1024 * 1024;
 const PIPE_NAME: &str = r"\\.\pipe\GameTweaks.Agent.v1";
 #[cfg(any(windows, test))]
 const MAX_FRAME_BYTES: usize = 1024 * 1024;
+const CONFIG_RESULT_TIMEOUT: Duration = Duration::from_secs(15);
 #[cfg(windows)]
 const AGENT_STATE_EVENT: &str = "gametweaks-agent-state";
 #[cfg(windows)]
@@ -375,7 +376,7 @@ pub async fn set_config(
             "the game agent disconnected",
         ));
     }
-    match tokio::time::timeout(Duration::from_secs(5), receiver).await {
+    match tokio::time::timeout(CONFIG_RESULT_TIMEOUT, receiver).await {
         Ok(Ok(Ok(restart_required))) => Ok(restart_required),
         Ok(Ok(Err(_))) => Err(agent_error(
             "agent_config_rejected",
@@ -1410,6 +1411,41 @@ mod tests {
                 ref agent_version,
                 ref proof,
             } if instance_id == "instance" && agent_version == "0.1.0" && proof == "proof"
+        ));
+    }
+
+    #[test]
+    fn agent_snapshot_accepts_camel_case_config_fields() {
+        let raw = br#"{
+            "type":"snapshot",
+            "protocolVersion":1,
+            "appId":2709570,
+            "instanceId":"instance",
+            "mods":[{
+                "modId":"supermarket-together-cheats",
+                "version":"0.2.0",
+                "name":{"en":"Supermarket Together Cheats"},
+                "description":{"en":"Agent-based cheats for Supermarket Together."},
+                "fields":[{
+                    "control":"boolean",
+                    "id":"infiniteMoney",
+                    "section":"Cheats",
+                    "key":"InfiniteMoney",
+                    "label":{"en":"Infinite money","de":"Unendlich Geld"},
+                    "description":{"en":"Allows every purchase without deducting money."},
+                    "default":false,
+                    "applyMode":"live",
+                    "display":"switch"
+                }],
+                "values":{"infiniteMoney":false}
+            }]
+        }"#;
+
+        let frame: IncomingFrame = serde_json::from_slice(raw).unwrap();
+        assert!(matches!(
+            frame,
+            IncomingFrame::Snapshot { mods, .. }
+                if mods.len() == 1 && mods[0].fields.len() == 1
         ));
     }
 
