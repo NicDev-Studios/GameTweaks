@@ -1045,7 +1045,7 @@ fn resolve_agent_target(app_id: u32) -> Option<(InstallTarget, AgentMarker)> {
 #[cfg(windows)]
 mod windows_pipe {
     use std::mem::size_of;
-    use std::os::windows::io::FromRawHandle;
+    use std::os::windows::io::{AsRawHandle, FromRawHandle};
     use std::ptr::null_mut;
 
     use windows_sys::Win32::Foundation::CloseHandle;
@@ -1058,8 +1058,8 @@ mod windows_pipe {
     use windows_sys::Win32::Security::{PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES};
     use windows_sys::Win32::Storage::FileSystem::PIPE_ACCESS_DUPLEX;
     use windows_sys::Win32::System::Pipes::{
-        ConnectNamedPipe, CreateNamedPipeW, GetNamedPipeClientProcessId, PIPE_READMODE_BYTE,
-        PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_WAIT,
+        ConnectNamedPipe, CreateNamedPipeW, GetNamedPipeClientProcessId, PeekNamedPipe,
+        PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_WAIT,
     };
     use windows_sys::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
@@ -1199,17 +1199,7 @@ mod windows_pipe {
             return;
         }
 
-        let Ok(mut writer) = pipe.try_clone() else {
-            return;
-        };
         let (sender, receiver) = mpsc::channel::<OutboundMessage>();
-        std::thread::spawn(move || {
-            while let Ok(message) = receiver.recv() {
-                if write_frame(&mut writer, &message.frame).is_err() {
-                    break;
-                }
-            }
-        });
         let status = {
             let state = app.state::<AppState>();
             state
@@ -1236,9 +1226,23 @@ mod windows_pipe {
             AGENT_STATE_EVENT,
             serde_json::json!({ "appId": app_id, "status": status }),
         );
-        while let Ok(frame) = read_frame(&mut pipe) {
-            if !handle_incoming(&app, app_id, &instance_id, frame) {
-                break;
+        'connected: loop {
+            while let Ok(message) = receiver.try_recv() {
+                if write_frame(&mut pipe, &message.frame).is_err() {
+                    break 'connected;
+                }
+            }
+            match frame_ready(&pipe) {
+                Ok(true) => {
+                    let Ok(frame) = read_frame(&mut pipe) else {
+                        break;
+                    };
+                    if !handle_incoming(&app, app_id, &instance_id, frame) {
+                        break;
+                    }
+                }
+                Ok(false) => std::thread::sleep(Duration::from_millis(2)),
+                Err(_) => break,
             }
         }
         let state = app.state::<AppState>();
@@ -1262,6 +1266,30 @@ mod windows_pipe {
             AGENT_STATE_EVENT,
             serde_json::json!({ "appId": app_id, "status": status }),
         );
+    }
+
+    fn frame_ready(pipe: &File) -> std::io::Result<bool> {
+        let mut header = [0_u8; 4];
+        let mut header_bytes = 0_u32;
+        let mut available = 0_u32;
+        let peeked = unsafe {
+            PeekNamedPipe(
+                pipe.as_raw_handle(),
+                header.as_mut_ptr().cast(),
+                header.len() as u32,
+                &mut header_bytes,
+                &mut available,
+                null_mut(),
+            )
+        };
+        if peeked == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        if header_bytes < header.len() as u32 {
+            return Ok(false);
+        }
+        let length = u32::from_le_bytes(header) as usize;
+        Ok(length == 0 || length > MAX_FRAME_BYTES || available as usize >= header.len() + length)
     }
 
     fn update_status(app: &AppHandle, app_id: u32, status: AgentConnectionStatus) {

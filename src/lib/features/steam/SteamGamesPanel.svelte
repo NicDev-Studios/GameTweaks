@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
+  import { SvelteMap } from 'svelte/reactivity';
   import InstallProgress from '$lib/components/InstallProgress.svelte';
   import SectionHeader from '$lib/components/SectionHeader.svelte';
   import {
@@ -59,7 +60,10 @@
   let drafts: Record<string, Record<string, unknown>> = {};
   let dirtyMods = new Set<string>();
   let modProgress: Record<string, ModInstallProgress> = {};
-  const configSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const configSaveTimers = new SvelteMap<
+    string,
+    ReturnType<typeof globalThis.setTimeout>
+  >();
 
   onMount(() => {
     void refreshGames();
@@ -92,7 +96,7 @@
       });
     return () => {
       disposed = true;
-      for (const timer of configSaveTimers.values()) clearTimeout(timer);
+      for (const timer of configSaveTimers.values()) globalThis.clearTimeout(timer);
       configSaveTimers.clear();
       stopListening?.();
       stopModProgress?.();
@@ -194,13 +198,6 @@
     }
     drafts = next;
     dirtyMods = new Set();
-  }
-
-  function resetModDraft(modId: string) {
-    const mod = support?.mods.find((candidate) => candidate.modId === modId);
-    if (!mod) return;
-    drafts = { ...drafts, [modId]: { ...mod.values } };
-    dirtyMods = new Set([...dirtyMods].filter((candidate) => candidate !== modId));
   }
 
   function clearModError(modId: string) {
@@ -371,10 +368,10 @@
   function scheduleConfigSave(modId: string, fieldId: string, value: unknown) {
     const key = `${modId}\0${fieldId}`;
     const previous = configSaveTimers.get(key);
-    if (previous) clearTimeout(previous);
+    if (previous) globalThis.clearTimeout(previous);
     configSaveTimers.set(
       key,
-      setTimeout(() => {
+      globalThis.setTimeout(() => {
         configSaveTimers.delete(key);
         void saveConfigValue(modId, fieldId, value);
       }, 200)
